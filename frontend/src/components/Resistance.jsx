@@ -58,6 +58,25 @@ export default function Resistance({ res, onFocus, focusKey }) {
         </div>
       )}
 
+      {res.own && (
+        <>
+          <div className="kv">
+            <span>
+              THIS stock's own breakouts ({res.own.n} in history)
+            </span>
+            <b>
+              {res.own.pushed_higher_5d_pct != null ? `${res.own.pushed_higher_5d_pct}% pushed higher` : "—"}
+            </b>
+          </div>
+          <p className="rec-detail">
+            {`Its own pattern: ${res.own.retest_21d_pct ?? "—"}% retested the broken line within a month, ` +
+              `${res.own.decisive_fail_21d_pct ?? "—"}% failed decisively (>3% below), and ` +
+              `${res.own.reached_prior_high_63d_pct ?? "—"}% went on to its prior high within 3 months. ` +
+              `Small sample — read alongside the universe rates above.`}
+          </p>
+        </>
+      )}
+
       <p className="situation">{res.headline}</p>
       {(res.odds || []).map((o, i) => (
         <p className="rec-detail" key={i}>

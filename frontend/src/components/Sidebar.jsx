@@ -9,6 +9,12 @@ import TradePlan from "./TradePlan";
 import RecentAction from "./RecentAction";
 import DipSignal from "./DipSignal";
 import Resistance from "./Resistance";
+import SectorPulse from "./SectorPulse";
+import EarningsWatch from "./EarningsWatch";
+import Pros from "./Pros";
+import GapCard from "./GapCard";
+import ExtensionCard from "./ExtensionCard";
+import Checklist from "./Checklist";
 
 export default function Sidebar({ data, focus, onFocus }) {
   if (!data) return null;
@@ -35,9 +41,21 @@ export default function Sidebar({ data, focus, onFocus }) {
     <aside className="sidebar">
       <RecentAction data={data} />
 
+      <Checklist checklist={data.checklist} />
+
       <DipSignal dip={data.dipSignal} ticker={data.ticker} />
 
       <Resistance res={data.resistance} onFocus={onFocus} focusKey={focusKey} />
+
+      <EarningsWatch watch={data.earningsWatch} />
+
+      <GapCard gap={data.gap} />
+
+      <ExtensionCard ext={data.extension} />
+
+      <Pros pros={data.pros} />
+
+      <SectorPulse pulse={data.sectorPulse} />
 
       <SignalGauge signal={data.signal} />
 

@@ -112,6 +112,48 @@ def _ath_bucket(dist: float) -> dict:
     return {"label": ">25% below", "p_reach_ath_63d": 0.08, "n": 1063}
 
 
+def _own_history(close: pd.Series, high: pd.Series) -> dict | None:
+    """THIS stock's own breakout track record over the supplied history:
+    every fresh close above its prior 50d high, and what happened after.
+    Sample sizes are small (n ~ 30-50 over 5y) — surfaced honestly."""
+    c = close.to_numpy(dtype=float)
+    h = high.to_numpy(dtype=float)
+    n = len(c)
+    if n < LOOKBACK + 80:
+        return None
+    events = []
+    for t in range(LOOKBACK + 1, n - 1):
+        if np.isnan(c[t]) or np.isnan(c[t - 1]):
+            continue
+        r_now = np.nanmax(h[t - LOOKBACK : t])
+        r_prev = np.nanmax(h[t - LOOKBACK - 1 : t - 1])
+        if c[t] > r_now and c[t - 1] <= r_prev:
+            events.append((t, r_now))
+    if len(events) < 8:
+        return None
+    higher5, retest21, decfail21, high63 = [], [], [], []
+    for t, lvl in events:
+        w5 = c[t + 1 : min(t + 6, n)]
+        w21 = c[t + 1 : min(t + 22, n)]
+        w63 = c[t + 1 : min(t + 64, n)]
+        prior_high = np.nanmax(c[:t])
+        if len(w5) >= 3:
+            higher5.append(np.nanmax(w5) > c[t])
+        if len(w21) >= 12:
+            retest21.append(np.nanmin(w21) < lvl)
+            decfail21.append(np.nanmin(w21) < lvl * 0.97)
+        if len(w63) >= 35:
+            high63.append(np.nanmax(w63) >= prior_high)
+    pct = lambda xs: round(100 * float(np.mean(xs)), 0) if xs else None
+    return {
+        "n": len(events),
+        "pushed_higher_5d_pct": pct(higher5),
+        "retest_21d_pct": pct(retest21),
+        "decisive_fail_21d_pct": pct(decfail21),
+        "reached_prior_high_63d_pct": pct(high63),
+    }
+
+
 def analyze(df: pd.DataFrame) -> dict:
     """Return the key resistance level, the current state vs it, and the
     historically measured odds for that state. Needs daily OHLCV with columns
@@ -167,6 +209,7 @@ def analyze(df: pd.DataFrame) -> dict:
 
     bucket = _ath_bucket(dist_ath)
     best_combo = bool(uptrend) and bool(vol_surge) and (dist_ath < 0.10)
+    own = _own_history(close, high)
 
     # ---- Honest narrative per state ----
     lvl_s = f"{level:,.2f}"
@@ -239,6 +282,7 @@ def analyze(df: pd.DataFrame) -> dict:
         "volume_surge": vol_surge,
         "uptrend": uptrend,
         "best_combo": best_combo,
+        "own": own,
         "headline": headline,
         "odds": odds,
         "evidence": EVIDENCE,

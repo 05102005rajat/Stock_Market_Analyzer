@@ -429,3 +429,24 @@ table.bt td:first-child { display: flex; align-items: center; gap: 6px; }
 /* ---- Exit alerts ---- */
 .exit-alerts .alert-row { cursor: pointer; }
 .exit-alerts .alert-row:hover { background: #141b2b; }
+
+/* Sector pulse member chips */
+.sector-members { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.sector-members .chip {
+  font-size: 11px; padding: 2px 8px; border-radius: 10px;
+  background: rgba(127,127,127,.12); border: 1px solid rgba(127,127,127,.25);
+}
+.sector-members .chip.pos { color: var(--pos, #16a34a); border-color: currentColor; }
+.sector-members .chip.neg { color: var(--neg, #dc2626); border-color: currentColor; }
+
+/* Buy checklist */
+.checklist { list-style: none; padding: 0; margin: 6px 0; }
+.check-item { display: flex; gap: 8px; margin: 8px 0; align-items: flex-start; }
+.check-item p { margin: 2px 0 0; font-size: 12.5px; line-height: 1.45; }
+.check-dot.good { color: var(--pos, #16a34a); }
+.check-dot.warn { color: #d97706; }
+.check-dot.bad { color: var(--neg, #dc2626); }
+.check-dot.info { color: #94a3b8; }
+.headline-list { list-style: none; padding: 0; margin: 4px 0; }
+.headline-list li { font-size: 12.5px; margin: 5px 0; line-height: 1.4; }
+.headline-list a { color: inherit; text-decoration: underline; }

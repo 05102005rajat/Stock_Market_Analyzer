@@ -10,19 +10,26 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 from services import (
+    analysts as analysts_engine,
     backtest,
     candlesticks,
+    checklist as checklist_engine,
     data,
     dipsignal,
+    earnings as earnings_engine,
+    extension as extension_engine,
     forecast,
+    gaps as gaps_engine,
     indicators,
     insights,
     minervini,
+    news as news_engine,
     patterns,
     portfolio as portfolio_svc,
     relative,
     resistance as resistance_engine,
     scanner as scanner_svc,
+    sector as sector_engine,
     strategies as strategies_svc,
     signal as signal_engine,
     target as target_planner,
@@ -139,6 +146,18 @@ def analyze():
         plan = target_planner.plan(daily, horizon=5)
         dip = dipsignal.verdict(daily)
         res = resistance_engine.analyze(daily)
+        sec = sector_engine.analyze(
+            ticker, lambda tk: data.fetch_ohlcv(tk, period="3mo", interval="1d")["close"]
+        )
+        earn = earnings_engine.analyze(ticker, daily)
+        pros = analysts_engine.snapshot(ticker, daily)
+        gap = gaps_engine.analyze(daily)
+        ext = extension_engine.analyze(daily)
+        heads = news_engine.headlines(ticker)
+        checklist = checklist_engine.build(
+            dip=dip, resistance=res, sector=sec, ext=ext,
+            earnings=earn, pros=pros, gap=gap, news=heads,
+        )
     except Exception as e:
         return jsonify({"error": f"Analysis failed: {e}"}), 500
 
@@ -166,6 +185,13 @@ def analyze():
             "tradePlan": plan,
             "dipSignal": dip,
             "resistance": res,
+            "sectorPulse": sec,
+            "earningsWatch": earn,
+            "pros": pros,
+            "gap": gap,
+            "extension": ext,
+            "headlines": heads,
+            "checklist": checklist,
         }
     )
 
