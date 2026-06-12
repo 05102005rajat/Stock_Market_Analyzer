@@ -450,3 +450,8 @@ table.bt td:first-child { display: flex; align-items: center; gap: 6px; }
 .headline-list { list-style: none; padding: 0; margin: 4px 0; }
 .headline-list li { font-size: 12.5px; margin: 5px 0; line-height: 1.4; }
 .headline-list a { color: inherit; text-decoration: underline; }
+
+/* Live price */
+.live-row { display: flex; align-items: baseline; gap: 12px; margin: 4px 0 8px; }
+.live-big { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.live-chg { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }

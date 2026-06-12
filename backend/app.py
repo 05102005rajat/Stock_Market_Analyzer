@@ -25,7 +25,9 @@ from services import (
     minervini,
     news as news_engine,
     patterns,
+    pattern_read as pattern_read_engine,
     portfolio as portfolio_svc,
+    quotes as quotes_engine,
     relative,
     resistance as resistance_engine,
     scanner as scanner_svc,
@@ -82,6 +84,12 @@ def scan_view():
         return jsonify(scanner_svc.scan(top_n=max(1, min(top_n, 15)), horizon_key=horizon_key))
     except Exception as e:
         return jsonify({"error": f"Scan failed: {e}"}), 500
+
+
+@app.get("/api/quote/<ticker>")
+def api_quote(ticker):
+    """Lightweight near-live quote for header polling (no full re-analyze)."""
+    return jsonify(quotes_engine.fetch(ticker))
 
 
 @app.get("/api/analyze")
@@ -154,6 +162,8 @@ def analyze():
         gap = gaps_engine.analyze(daily)
         ext = extension_engine.analyze(daily)
         heads = news_engine.headlines(ticker)
+        pread = pattern_read_engine.analyze(daily, chart_patterns=pat["patterns"])
+        quote = quotes_engine.fetch(ticker)
         checklist = checklist_engine.build(
             dip=dip, resistance=res, sector=sec, ext=ext,
             earnings=earn, pros=pros, gap=gap, news=heads,
@@ -192,6 +202,8 @@ def analyze():
             "extension": ext,
             "headlines": heads,
             "checklist": checklist,
+            "patternRead": pread,
+            "quote": quote,
         }
     )
 

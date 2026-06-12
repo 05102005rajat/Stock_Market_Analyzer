@@ -15,6 +15,8 @@ import Pros from "./Pros";
 import GapCard from "./GapCard";
 import ExtensionCard from "./ExtensionCard";
 import Checklist from "./Checklist";
+import PatternRead from "./PatternRead";
+import LivePrice from "./LivePrice";
 
 export default function Sidebar({ data, focus, onFocus }) {
   if (!data) return null;
@@ -41,7 +43,11 @@ export default function Sidebar({ data, focus, onFocus }) {
     <aside className="sidebar">
       <RecentAction data={data} />
 
+      <LivePrice ticker={data.ticker} initial={data.quote} />
+
       <Checklist checklist={data.checklist} />
+
+      <PatternRead read={data.patternRead} />
 
       <DipSignal dip={data.dipSignal} ticker={data.ticker} />
 
