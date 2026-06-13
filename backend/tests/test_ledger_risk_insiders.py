@@ -96,18 +96,44 @@ def test_concentration_flags_single_and_theme():
 
 
 # ---------- insiders ----------
-def test_insider_cluster_detected():
+def test_insider_detects_real_buys():
     def mock(tk):
-        return [{"filed": "2026-06-10", "display_names": ["X (CEO)"], "is_purchase": True},
-                {"filed": "2026-06-09", "display_names": ["Y (CFO)"], "is_purchase": True},
-                {"filed": "2026-06-08", "display_names": ["Z (Director)"], "is_purchase": True}]
+        return [
+            {"code": "P", "shares": 5000, "price": 185.0, "ad": "A", "owner": "Smith", "role": "CEO"},
+            {"code": "P", "shares": 2000, "price": 186.0, "ad": "A", "owner": "Doe", "role": "CFO"},
+            {"code": "P", "shares": 1000, "price": 184.0, "ad": "A", "owner": "Roe", "role": "Director"},
+            {"code": "M", "shares": 9000, "price": 50.0, "ad": "A", "owner": "Smith", "role": "CEO"},
+        ]
     insiders._CACHE.clear()
-    out = insiders.analyze("TEST", fetch_form4=mock)
-    assert out["available"] and out["cluster"] is True
-    assert out["n_insiders_21d"] == 3 and out["csuite_filings"] == 2
+    out = insiders.analyze("BUY", fetch_transactions=mock)
+    assert out["available"] and out["signal"] == "buying"
+    assert out["cluster_buy"] is True and out["buy_csuite"] is True
+    assert out["buy_shares"] == 8000  # option exercise excluded
+    assert out["buy_avg_price"] == pytest.approx(185.0, abs=0.5)
+
+
+def test_insider_detects_selling():
+    def mock(tk):
+        return [
+            {"code": "S", "shares": 50000, "price": 290.0, "ad": "D", "owner": "A", "role": "SVP"},
+            {"code": "F", "shares": 5000, "price": 290.0, "ad": "D", "owner": "A", "role": "SVP"},
+        ]
+    insiders._CACHE.clear()
+    out = insiders.analyze("SELL", fetch_transactions=mock)
+    assert out["signal"] == "selling" and out["sell_shares"] == 50000
+    assert "SOLD" in out["badge"]
+
+
+def test_insider_routine_only():
+    def mock(tk):
+        return [{"code": "A", "shares": 1000, "price": 0, "ad": "A", "owner": "X", "role": "Dir"},
+                {"code": "M", "shares": 5000, "price": 50, "ad": "A", "owner": "Y", "role": "CEO"}]
+    insiders._CACHE.clear()
+    out = insiders.analyze("ROUT", fetch_transactions=mock)
+    assert out["signal"] == "routine" and out["n_routine"] == 2
 
 
 def test_insider_no_data_degrades():
     insiders._CACHE.clear()
-    out = insiders.analyze("TEST", fetch_form4=lambda tk: [])
+    out = insiders.analyze("NONE", fetch_transactions=lambda tk: [])
     assert out["available"] is False

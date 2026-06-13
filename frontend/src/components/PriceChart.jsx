@@ -27,12 +27,37 @@ export default function PriceChart({ data, toggles, focus, intraday = false }) {
       layout: {
         background: { type: ColorType.Solid, color: "#0e1117" },
         textColor: "#c9d1d9",
-        fontFamily: "system-ui, sans-serif",
+        fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+        fontSize: 12,
       },
-      grid: { vertLines: { color: "#1c2333" }, horzLines: { color: "#1c2333" } },
-      rightPriceScale: { borderColor: "#30363d" },
-      timeScale: { borderColor: "#30363d", timeVisible: intraday, secondsVisible: false },
-      crosshair: { mode: 0 },
+      grid: { vertLines: { color: "#161b26" }, horzLines: { color: "#161b26" } },
+      rightPriceScale: {
+        borderColor: "#30363d",
+        scaleMargins: { top: 0.08, bottom: 0.12 },
+        entireTextOnly: true,
+      },
+      timeScale: {
+        borderColor: "#30363d",
+        timeVisible: intraday,
+        secondsVisible: false,
+        rightOffset: 6,
+        barSpacing: 8,
+      },
+      crosshair: {
+        mode: 1, // magnet — snaps to candles like TradingView
+        vertLine: { color: "#4f9eff88", width: 1, style: LineStyle.Dashed,
+                    labelBackgroundColor: "#1f6feb" },
+        horzLine: { color: "#4f9eff88", width: 1, style: LineStyle.Dashed,
+                    labelBackgroundColor: "#1f6feb" },
+      },
+      watermark: {
+        visible: true,
+        text: data.ticker || "",
+        fontSize: 56,
+        color: "rgba(120,140,180,0.06)",
+        horzAlign: "center",
+        vertAlign: "center",
+      },
       height: 460,
       autoSize: true,
     });
@@ -44,6 +69,8 @@ export default function PriceChart({ data, toggles, focus, intraday = false }) {
       borderDownColor: "#ef5350",
       wickUpColor: "#26a69a",
       wickDownColor: "#ef5350",
+      priceLineColor: "#4f9eff",
+      priceLineStyle: LineStyle.Dotted,
     });
     candleSeries.setData(
       data.candles.map((c) => ({

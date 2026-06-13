@@ -53,6 +53,14 @@ export default function App() {
   // {times:[], levels:[], key} — the bars/levels a clicked signal is based on.
   const [focus, setFocus] = useState(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [plainMode, setPlainMode] = useState(() => {
+    try { return localStorage.getItem("plainMode") === "1"; } catch { return false; }
+  });
+  const togglePlain = () => setPlainMode((v) => {
+    const nv = !v;
+    try { localStorage.setItem("plainMode", nv ? "1" : "0"); } catch { /* ignore */ }
+    return nv;
+  });
   const [recentTickers, setRecentTickers] = useState(() => {
     try { return JSON.parse(localStorage.getItem("recentTickers") || "[]"); } catch { return []; }
   });
@@ -213,6 +221,9 @@ export default function App() {
             <button className={`chip ${mode === "ledger" ? "on" : ""}`} onClick={() => setMode("ledger")}>📒 Signal Ledger</button>
             <button className={`chip ${mode === "help" ? "on" : ""}`} onClick={() => setMode("help")}>❓ Help</button>
             <button className="chip cmdk-btn" onClick={() => setPaletteOpen(true)} title="Quick jump (Cmd/Ctrl+K)">⌘K Jump</button>
+            <button className={`chip plain-toggle ${plainMode ? "on" : ""}`} onClick={togglePlain} title="Explain everything in plain English (no jargon)">
+              {plainMode ? "🟢 Plain English" : "🔤 Plain English"}
+            </button>
           </div>
         </div>
         <form className="search" onSubmit={run} style={{ display: mode === "analyze" ? "flex" : "none" }}>
@@ -349,11 +360,24 @@ export default function App() {
           )}
           <div className="layout">
             <main className="main">
-              <PriceChart data={data} toggles={toggles} focus={focus} intraday={interval === "1h"} />
+              {compareData ? (
+                <div className="dual-charts">
+                  <div className="dual-chart-pane">
+                    <div className="dual-chart-label">{data.ticker}</div>
+                    <PriceChart data={data} toggles={toggles} focus={focus} intraday={interval === "1h"} />
+                  </div>
+                  <div className="dual-chart-pane">
+                    <div className="dual-chart-label">{compareData.ticker}</div>
+                    <PriceChart data={compareData} toggles={toggles} focus={null} intraday={interval === "1h"} />
+                  </div>
+                </div>
+              ) : (
+                <PriceChart data={data} toggles={toggles} focus={focus} intraday={interval === "1h"} />
+              )}
               <IndicatorPanel data={data} />
               <Alerts data={data} ticker={data.ticker} />
             </main>
-            <Sidebar data={data} focus={focus} onFocus={setFocus} />
+            <Sidebar data={data} focus={focus} onFocus={setFocus} plainMode={plainMode} />
           </div>
         </>
       )}

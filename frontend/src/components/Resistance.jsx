@@ -10,7 +10,9 @@ const STATE_META = {
   below: { label: "BELOW RESISTANCE", cls: "neg" },
 };
 
-export default function Resistance({ res, onFocus, focusKey }) {
+import { Plain } from "./Plain";
+
+export default function Resistance({ res, onFocus, focusKey, plainMode = false }) {
   if (!res || !res.available) return null;
   const meta = STATE_META[res.state] || STATE_META.below;
   const key = "resistance-level";
@@ -31,6 +33,15 @@ export default function Resistance({ res, onFocus, focusKey }) {
         ◎ {res.level}
       </div>
 
+      <Plain on={plainMode}>
+        {res.state === "below"
+          ? `The next price 'ceiling' to watch is $${res.level} (${res.pct_to_level > 0 ? "+" : ""}${res.pct_to_level}% away). It's too far off to matter yet — watch if it gets close.`
+          : res.state === "approaching"
+          ? `${'$'}${res.level} is the ceiling it's bumping against. If it breaks ABOVE that, history says it often keeps climbing; most of the time it does NOT just bounce straight back down.`
+          : res.state === "fresh_breakout"
+          ? `It just pushed ABOVE the $${res.level} ceiling. Expect it to dip back and re-test that line — that's normal, not failure.`
+          : `It's trading above the old $${res.level} ceiling, which is a healthy sign.`}
+      </Plain>
       <div className="kv">
         <span>Distance to it</span>
         <b>{res.pct_to_level > 0 ? `+${res.pct_to_level}%` : `${res.pct_to_level}%`}</b>

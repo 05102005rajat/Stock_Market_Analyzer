@@ -3,13 +3,19 @@
 // score to obey.
 const DOT = { good: "●", warn: "●", bad: "●", info: "○" };
 
-export default function Checklist({ checklist }) {
+import { Plain } from "./Plain";
+
+export default function Checklist({ checklist, plainMode = false }) {
   if (!checklist || !checklist.available) return null;
   return (
     <section className="card">
       <div className="insights-head">
         <h3>The full picture</h3>
       </div>
+      <Plain on={plainMode}>
+        Green dots are points in this stock's favor, red dots are warnings, hollow dots are neutral. Read them
+        together to get the whole story — there's no single score to obey.
+      </Plain>
       <ul className="checklist">
         {checklist.factors.map((f, i) => (
           <li key={i} className={`check-item ${f.status}`}>

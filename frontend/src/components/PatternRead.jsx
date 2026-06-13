@@ -1,7 +1,9 @@
 // What the patterns ACTUALLY say — one synthesized verdict instead of a
 // name dump. Net directional tilt from measured per-stock pattern stats,
 // conflict detection, and the AI-era regime check.
-export default function PatternRead({ read }) {
+import { Plain } from "./Plain";
+
+export default function PatternRead({ read, plainMode = false }) {
   if (!read || !read.available) return null;
   const dirCls =
     read.direction === "BULLISH" ? "pos" : read.direction === "BEARISH" ? "neg" : "neutral";
@@ -17,6 +19,13 @@ export default function PatternRead({ read }) {
           </span>
         )}
       </div>
+      <Plain on={plainMode}>
+        {read.n_signals === 0
+          ? "The chart shapes are quiet right now — nothing worth acting on."
+          : read.direction === "FLAT"
+          ? "The bullish and bearish chart signals roughly cancel out. Honest read: no clear direction, don't act on these."
+          : `The recent chart shapes lean ${read.direction.toLowerCase()}, but only mildly. These are weak hints, not predictions.`}
+      </Plain>
 
       {read.n_signals > 0 && (
         <div className="kv">

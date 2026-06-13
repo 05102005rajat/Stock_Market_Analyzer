@@ -20,7 +20,7 @@ import LivePrice from "./LivePrice";
 import InsiderCard from "./InsiderCard";
 import SizingCard from "./SizingCard";
 
-export default function Sidebar({ data, focus, onFocus }) {
+export default function Sidebar({ data, focus, onFocus, plainMode = false }) {
   if (!data) return null;
   const { trend, latest = {}, patterns = [], levels = {}, forecast, meta } = data;
   const mtf = data.multiTimeframe;
@@ -43,19 +43,19 @@ export default function Sidebar({ data, focus, onFocus }) {
 
   return (
     <aside className="sidebar">
-      <RecentAction data={data} />
+      <RecentAction data={data} plainMode={plainMode} />
 
       <LivePrice ticker={data.ticker} initial={data.quote} />
 
-      <Checklist checklist={data.checklist} />
+      <Checklist checklist={data.checklist} plainMode={plainMode} />
 
-      <PatternRead read={data.patternRead} />
+      <PatternRead read={data.patternRead} plainMode={plainMode} />
 
-      <DipSignal dip={data.dipSignal} ticker={data.ticker} />
+      <DipSignal dip={data.dipSignal} ticker={data.ticker} plainMode={plainMode} />
 
-      <Resistance res={data.resistance} onFocus={onFocus} focusKey={focusKey} />
+      <Resistance res={data.resistance} onFocus={onFocus} focusKey={focusKey} plainMode={plainMode} />
 
-      <SizingCard sizing={data.sizing} ticker={data.ticker} />
+      <SizingCard sizing={data.sizing} ticker={data.ticker} plainMode={plainMode} />
 
       <EarningsWatch watch={data.earningsWatch} />
 
@@ -63,9 +63,9 @@ export default function Sidebar({ data, focus, onFocus }) {
 
       <ExtensionCard ext={data.extension} />
 
-      <Pros pros={data.pros} />
+      <Pros pros={data.pros} plainMode={plainMode} />
 
-      <InsiderCard insider={data.insider} />
+      <InsiderCard insider={data.insider} plainMode={plainMode} />
 
       <SectorPulse pulse={data.sectorPulse} />
 

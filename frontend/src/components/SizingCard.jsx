@@ -1,6 +1,8 @@
+import { Plain } from "./Plain";
+
 // Position sizing — ATR stop + share count for a 1%-risk bite on a $5k account.
 // Risk management, not a signal. Flags when conviction would breach 10% sizing.
-export default function SizingCard({ sizing, ticker }) {
+export default function SizingCard({ sizing, ticker, plainMode = false }) {
   if (!sizing || !sizing.available) return null;
   const big = (sizing.position_pct_of_account ?? 0) > 10;
   return (
@@ -9,6 +11,13 @@ export default function SizingCard({ sizing, ticker }) {
         <h3>If you sized this (1% risk)</h3>
         {big && <span className="bias-badge neg">&gt;10% OF ACCOUNT</span>}
       </div>
+      <Plain on={plainMode}>
+        A sensible "only lose 1% if I'm wrong" position here would be about {sizing.shares} shares
+        (${sizing.position_value}), with an automatic sell-to-cap-losses order at ${sizing.stop_price}.
+        {big
+          ? ` That's ${sizing.position_pct_of_account}% of a $5,000 account — bigger than the 10% one-stock limit, so consider buying less.`
+          : ` That's a reasonable slice of a $5,000 account.`}
+      </Plain>
       <div className="kv">
         <span>ATR stop</span>
         <b>

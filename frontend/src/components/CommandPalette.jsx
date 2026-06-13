@@ -17,6 +17,8 @@ export default function CommandPalette({ open, onClose, onTicker, onPage, owned 
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
   const inputRef = useRef(null);
+  const listRef = useRef(null);
+  const itemRefs = useRef([]);
 
   useEffect(() => {
     if (open) {
@@ -47,6 +49,12 @@ export default function CommandPalette({ open, onClose, onTicker, onPage, owned 
   useEffect(() => {
     setSel((s) => Math.min(s, Math.max(0, results.length - 1)));
   }, [results.length]);
+
+  // Keep the highlighted row visible as you arrow through a long list.
+  useEffect(() => {
+    const el = itemRefs.current[sel];
+    if (el) el.scrollIntoView({ block: "nearest" });
+  }, [sel]);
 
   if (!open) return null;
 
@@ -84,10 +92,11 @@ export default function CommandPalette({ open, onClose, onTicker, onPage, owned 
           placeholder="Jump to a ticker or page…  (↑↓ to move, Enter to go, Esc to close)"
           spellCheck={false}
         />
-        <ul className="cmdk-list">
+        <ul className="cmdk-list" ref={listRef}>
           {results.map((r, i) => (
             <li
               key={`${r.type}-${r.id}`}
+              ref={(el) => (itemRefs.current[i] = el)}
               className={`cmdk-item ${i === sel ? "sel" : ""}`}
               onMouseEnter={() => setSel(i)}
               onClick={() => choose(r)}
