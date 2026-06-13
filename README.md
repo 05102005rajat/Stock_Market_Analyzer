@@ -201,15 +201,70 @@ The response also includes a `multiTimeframe` block (`horizons`, `alignment`,
 
 ```bash
 cd backend
-./venv/bin/python -m pytest tests/ -q     # 22 tests, no network needed
+./venv/bin/python -m pytest tests/ -q     # 121 tests, no network needed
 ```
 
 Returns one JSON payload with `candles`, `indicators`, `trend`, `levels`,
 `patterns`, and `forecast`.
 
+## Evidence-backed engines (what each card actually measures)
+
+Every analytical card is built on measured base rates, not vibes. Several
+research scripts (`*_test.py` in `backend/`) reproduce the numbers on the
+cached 80-ticker, 10-year, point-in-time universe.
+
+**Single-stock analysis (`/api/analyze`)**
+- `resistance` — key 50d-high resistance, swing-touch count, breakout state, and
+  HONEST base rates: 81% of approaches break above within a month; reaching the
+  prior ATH within 63d depends on distance (88% if <2% below, 8% if >25%). Plus
+  this stock's OWN breakout track record. No measured alpha vs other stocks.
+- `patternRead` — synthesizes recent candlesticks into ONE directional tilt with
+  per-stock, direction-aware win rates (drops n<10), flags conflicts, and runs a
+  REGIME CHECK (last 2y vs full decade) to catch AI-era non-stationarity.
+- `extension` — "rubber band" vs 50d MA. Measured: extension was a momentum
+  signal (+11% fwd 63d vs +6%), NOT a top — but predicted a -17% median interim
+  drawdown. A seatbelt gauge, not an exit signal.
+- `gap` — opening-gap continuation vs fade on the stock's own history; documented
+  market-wide average leans FADE (Lou/Polk/Skouras).
+- `sectorPulse` — sector breadth + "is it me or everyone?" closest-peer
+  attribution. Measured: sector-wide selloffs price same-day (no contagion edge).
+- `earningsWatch` — Finnhub earnings date + the validated (t=-2.39) "hot run-up
+  into earnings = expectations pre-paid" flag.
+- `pros` — analyst consensus one-liner (sentiment gauge, targets skew optimistic).
+- `insider` — **SEC Form 4 cluster-buy detector** (the best evidence-backed FREE
+  signal: Lakonishok-Lee, Cohen-Malloy-Pomorski). 3+ insiders, C-suite weighted.
+  Needs `SEC_USER_AGENT` env var; degrades gracefully without SEC access.
+- `sizing` — ATR-stop position sizing for a 1%-risk bite; flags >10% positions.
+- `checklist` — composes trend / dip / sector / extension / earnings / pros / gap
+  + recent headlines into one read. No composite score (blending added no edge).
+
+**Signal ledger (`/api/ledger`)** — the integrity capstone. Every directional
+signal the app emits is logged to SQLite and auto-scored at 5/21/63 days against
+SPY, building the app's OWN live out-of-sample track record + a calibration curve
+(did "81% break above" resolve ~81% live?). See the 📒 Signal Ledger tab.
+
+**Portfolio (`/api/portfolio`, `/api/portfolio-risk`)** — ETF look-through to TRUE
+single-name exposure, plus concentration flags (single-name >10%, AI/semi theme
+>40%), weekly vol, drawdown, and fee drag. Holdings live in `holdings.json`.
+
+**Live quotes (`/api/quote/<ticker>`)** — ~15-min-delayed last price; the header
+LivePrice bar polls it every 60s so prices refresh without re-clicking Analyze.
+
+### Environment variables (all optional)
+- `FINNHUB_API_KEY` — enables the earnings-date card (free tier, 60 req/min).
+- `SEC_USER_AGENT` — `"Name email@example.com"` for the insider engine (SEC requires it).
+
+### Research scripts (reproduce the numbers; run from `backend/`)
+- `crosssection_test.py` — sector/peer/run-up hypotheses (3 of 4 failed honestly).
+- `gap_universe_test.py` — gap continuation vs fade across the universe.
+- `politician_trade_test.py` — does copying disclosed political trades beat QQQ?
+  (Harness + honest finding: the 45-day lag makes it ~index-like.)
+
 ## Ideas to extend
 
-- Swap the forecast model for an LSTM (TensorFlow/PyTorch) and compare metrics.
-- Add more patterns (triangles, flags, cup-and-handle, wedges).
-- Backtest pattern signals to measure historical edge.
-- Cache yfinance responses (Redis) to avoid rate limits.
+- Add a VIX-tercile regime split to ALL base-rate cards (not just patterns).
+- Fix survivorship bias: add delisted/fallen tickers to the cached universe.
+- Background scheduler (APScheduler) to pre-compute watchlist analyses + push a
+  morning briefing; convert the frontend to a PWA for installable mobile use.
+- Build the insider cluster signal into the ledger and forward-test it.
+

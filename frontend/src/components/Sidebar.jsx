@@ -17,6 +17,8 @@ import ExtensionCard from "./ExtensionCard";
 import Checklist from "./Checklist";
 import PatternRead from "./PatternRead";
 import LivePrice from "./LivePrice";
+import InsiderCard from "./InsiderCard";
+import SizingCard from "./SizingCard";
 
 export default function Sidebar({ data, focus, onFocus }) {
   if (!data) return null;
@@ -53,6 +55,8 @@ export default function Sidebar({ data, focus, onFocus }) {
 
       <Resistance res={data.resistance} onFocus={onFocus} focusKey={focusKey} />
 
+      <SizingCard sizing={data.sizing} ticker={data.ticker} />
+
       <EarningsWatch watch={data.earningsWatch} />
 
       <GapCard gap={data.gap} />
@@ -60,6 +64,8 @@ export default function Sidebar({ data, focus, onFocus }) {
       <ExtensionCard ext={data.extension} />
 
       <Pros pros={data.pros} />
+
+      <InsiderCard insider={data.insider} />
 
       <SectorPulse pulse={data.sectorPulse} />
 

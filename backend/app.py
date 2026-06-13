@@ -21,6 +21,8 @@ from services import (
     forecast,
     gaps as gaps_engine,
     indicators,
+    ledger as ledger_engine,
+    insiders as insiders_engine,
     insights,
     minervini,
     news as news_engine,
@@ -29,6 +31,7 @@ from services import (
     portfolio as portfolio_svc,
     quotes as quotes_engine,
     relative,
+    risk as risk_engine,
     resistance as resistance_engine,
     scanner as scanner_svc,
     sector as sector_engine,
@@ -90,6 +93,32 @@ def scan_view():
 def api_quote(ticker):
     """Lightweight near-live quote for header polling (no full re-analyze)."""
     return jsonify(quotes_engine.fetch(ticker))
+
+
+@app.get("/api/ledger")
+def api_ledger():
+    """The signal ledger's recent entries + live calibration scoreboard."""
+    try:
+        ledger_engine.evaluate(lambda tk: data.fetch_ohlcv(tk, period="1y", interval="1d")["close"])
+    except Exception:
+        pass  # scoring is best-effort
+    return jsonify({
+        "calibration": ledger_engine.calibration(),
+        "recent": ledger_engine.recent(limit=40),
+    })
+
+
+@app.get("/api/portfolio-risk")
+def api_portfolio_risk():
+    """Concentration + look-through theme exposure for the user's holdings."""
+    try:
+        pf = portfolio_svc.analyze_portfolio()
+    except Exception as e:
+        return jsonify({"error": f"portfolio risk failed: {e}"}), 500
+    return jsonify({
+        "concentration": pf.get("concentration", {"available": False}),
+        "look_through": pf.get("look_through", {}),
+    })
 
 
 @app.get("/api/analyze")
@@ -164,6 +193,9 @@ def analyze():
         heads = news_engine.headlines(ticker)
         pread = pattern_read_engine.analyze(daily, chart_patterns=pat["patterns"])
         quote = quotes_engine.fetch(ticker)
+        insider = insiders_engine.analyze(ticker)
+        ref_price = (quote.get("price") if quote.get("available") else None) or float(daily["close"].iloc[-1])
+        sizing = risk_engine.size_position(account=5000.0, entry=ref_price, df=daily)
         checklist = checklist_engine.build(
             dip=dip, resistance=res, sector=sec, ext=ext,
             earnings=earn, pros=pros, gap=gap, news=heads,
@@ -171,7 +203,7 @@ def analyze():
     except Exception as e:
         return jsonify({"error": f"Analysis failed: {e}"}), 500
 
-    return jsonify(
+    payload = (
         {
             "ticker": ticker.upper(),
             "meta": data.get_meta(ticker),
@@ -204,8 +236,15 @@ def analyze():
             "checklist": checklist,
             "patternRead": pread,
             "quote": quote,
+            "insider": insider,
+            "sizing": sizing,
         }
     )
+    try:
+        ledger_engine.log_from_analysis(ticker.upper(), payload)
+    except Exception:
+        pass  # ledger is best-effort; never break analyze
+    return jsonify(payload)
 
 
 if __name__ == "__main__":

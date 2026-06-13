@@ -9,6 +9,8 @@ import Portfolio from "./components/Portfolio";
 import Scan from "./components/Scan";
 import Help from "./components/Help";
 import StrategyLab from "./components/StrategyLab";
+import Ledger from "./components/Ledger";
+import CommandPalette from "./components/CommandPalette";
 
 const PERIODS = ["1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "max"];
 const INTERVALS = [
@@ -50,6 +52,10 @@ export default function App() {
   const [scanHorizon, setScanHorizon] = useState("1m");
   // {times:[], levels:[], key} — the bars/levels a clicked signal is based on.
   const [focus, setFocus] = useState(null);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [recentTickers, setRecentTickers] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("recentTickers") || "[]"); } catch { return []; }
+  });
   // Start the chart clean (just price + moving-average lines). The user can
   // switch on trend/levels/forecast/patterns from the chips when they want them.
   const [toggles, setToggles] = useState({
@@ -61,6 +67,24 @@ export default function App() {
     candles: false,
     forecast: false,
   });
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  useEffect(() => {
+    // Preload holdings once so owned tickers appear in the palette & quick-switch
+    // even before the user opens the Portfolio tab.
+    if (!portfolio && !pfLoading) loadPortfolio();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const run = async (e, tickerOverride) => {
     e?.preventDefault();
@@ -131,10 +155,20 @@ export default function App() {
   };
 
   // Click a holding → jump to its full single-stock analysis.
+  const pushRecent = (t) => {
+    setRecentTickers((prev) => {
+      const next = [t, ...prev.filter((x) => x !== t)].slice(0, 10);
+      try { localStorage.setItem("recentTickers", JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  };
+
   const pick = (t) => {
-    setTicker(t);
+    const up = (t || "").toUpperCase();
+    setTicker(up);
     setMode("analyze");
-    run(null, t);
+    pushRecent(up);
+    run(null, up);
   };
 
   const loadScan = async (horizon = scanHorizon) => {
@@ -156,8 +190,18 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
+  const ownedTickers = (portfolio?.holdings || []).map((h) => h.ticker).filter(Boolean);
+
   return (
     <div className="app">
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        onTicker={(t) => pick(t)}
+        onPage={(p) => setMode(p)}
+        owned={ownedTickers}
+        recent={recentTickers}
+      />
       <header className="topbar">
         <div className="brand">
           <h1>📈 Stock Pattern &amp; Trend Analyzer</h1>
@@ -166,7 +210,9 @@ export default function App() {
             <button className={`chip ${mode === "portfolio" ? "on" : ""}`} onClick={() => setMode("portfolio")}>My Portfolio</button>
             <button className={`chip ${mode === "scan" ? "on" : ""}`} onClick={() => setMode("scan")}>Buy Zones</button>
             <button className={`chip ${mode === "strategies" ? "on" : ""}`} onClick={() => setMode("strategies")}>🧪 Strategy Lab</button>
+            <button className={`chip ${mode === "ledger" ? "on" : ""}`} onClick={() => setMode("ledger")}>📒 Signal Ledger</button>
             <button className={`chip ${mode === "help" ? "on" : ""}`} onClick={() => setMode("help")}>❓ Help</button>
+            <button className="chip cmdk-btn" onClick={() => setPaletteOpen(true)} title="Quick jump (Cmd/Ctrl+K)">⌘K Jump</button>
           </div>
         </div>
         <form className="search" onSubmit={run} style={{ display: mode === "analyze" ? "flex" : "none" }}>
@@ -213,6 +259,22 @@ export default function App() {
             {loading ? "Analyzing…" : "Analyze"}
           </button>
         </form>
+
+        {mode === "analyze" && (recentTickers.length > 0 || ownedTickers.length > 0) && (
+          <div className="quick-switch">
+            <span className="dim small">Quick:</span>
+            {Array.from(new Set([...recentTickers, ...ownedTickers])).slice(0, 12).map((t) => (
+              <button
+                key={t}
+                className={`chip mini-chip ${t === ticker ? "on" : ""}`}
+                onClick={() => pick(t)}
+                title={ownedTickers.includes(t) ? "You own this" : "Recently viewed"}
+              >
+                {ownedTickers.includes(t) ? "◆ " : ""}{t}
+              </button>
+            ))}
+          </div>
+        )}
       </header>
 
       {mode === "portfolio" && (
@@ -226,6 +288,7 @@ export default function App() {
         />
       )}
 
+      {mode === "ledger" && <Ledger />}
       {mode === "help" && <Help />}
 
       {mode === "strategies" && <StrategyLab onPick={pick} />}

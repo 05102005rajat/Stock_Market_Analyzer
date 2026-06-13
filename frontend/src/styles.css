@@ -455,3 +455,37 @@ table.bt td:first-child { display: flex; align-items: center; gap: 6px; }
 .live-row { display: flex; align-items: baseline; gap: 12px; margin: 4px 0 8px; }
 .live-big { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .live-chg { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* Signal ledger page */
+.ledger-page { display: flex; flex-direction: column; gap: 16px; }
+.ledger-table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 8px 0; }
+.ledger-table th { text-align: right; padding: 6px 10px; color: #94a3b8; font-weight: 600;
+  border-bottom: 1px solid rgba(127,127,127,.2); }
+.ledger-table th:first-child, .ledger-table td:first-child { text-align: left; }
+.ledger-table td { text-align: right; padding: 6px 10px; font-variant-numeric: tabular-nums;
+  border-bottom: 1px solid rgba(127,127,127,.08); }
+.ledger-table h4 { margin: 12px 0 4px; }
+
+/* Command palette */
+.cmdk-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45);
+  display: flex; align-items: flex-start; justify-content: center; z-index: 1000;
+  padding-top: 12vh; backdrop-filter: blur(2px); }
+.cmdk { width: min(560px, 92vw); background: var(--card, #161a22);
+  border: 1px solid rgba(127,127,127,.3); border-radius: 12px; overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+.cmdk-input { width: 100%; box-sizing: border-box; padding: 16px 18px; font-size: 15px;
+  background: transparent; border: none; border-bottom: 1px solid rgba(127,127,127,.2);
+  color: inherit; outline: none; }
+.cmdk-list { list-style: none; margin: 0; padding: 6px; max-height: 50vh; overflow-y: auto; }
+.cmdk-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+  border-radius: 8px; cursor: pointer; }
+.cmdk-item.sel { background: rgba(41,98,255,.18); }
+.cmdk-icon { width: 18px; text-align: center; }
+.cmdk-label { flex: 1; font-weight: 500; }
+.cmdk-hint { margin-left: auto; }
+.cmdk-btn { opacity: .85; font-variant-numeric: tabular-nums; }
+
+/* Quick-switch ticker row */
+.quick-switch { display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  margin: 8px 0 2px; }
+.mini-chip { font-size: 12px; padding: 3px 9px; }

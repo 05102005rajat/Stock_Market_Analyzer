@@ -1,0 +1,113 @@
+"""Tests for services/ledger.py, services/risk.py, services/insiders.py."""
+import os
+import tempfile
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from services import insiders, ledger, risk
+
+
+@pytest.fixture(autouse=True)
+def temp_db(monkeypatch):
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    monkeypatch.setattr(ledger, "DB", path)
+    yield
+    os.unlink(path)
+
+
+def _prices(start="2026-01-02", n=120, drift=0.001):
+    idx = pd.bdate_range(start, periods=n)
+    return pd.Series(100 * np.exp(np.cumsum(np.full(n, drift))), index=idx)
+
+
+# ---------- ledger ----------
+def test_ledger_log_and_dedup():
+    assert ledger.log("MU", "dip_buy", "up", 100.0, ts="2026-03-01") is True
+    assert ledger.log("MU", "dip_buy", "up", 100.0, ts="2026-03-01") is False  # dup same day
+    assert len(ledger.recent()) == 1
+
+
+def test_ledger_log_from_analysis_extracts_signals():
+    payload = {
+        "quote": {"available": True, "price": 200.0},
+        "resistance": {"available": True, "state": "fresh_breakout",
+                       "ath_bucket": {"p_reach_ath_63d": 0.62}, "headline": "h"},
+        "dipSignal": {"available": True, "active": True},
+        "patternRead": {"available": True, "direction": "BEARISH", "p_up_10bar": 0.42, "tilt_pp": -5},
+        "earningsWatch": {"available": True, "hot_runup": True, "note": "hot"},
+    }
+    logged = ledger.log_from_analysis("NVDA", payload)
+    assert set(logged) == {"resistance_breakout", "dip_buy", "pattern_tilt", "earnings_runup"}
+
+
+def test_ledger_evaluate_and_calibration():
+    ledger.log("AAA", "dip_buy", "up", None or 100.0, ts="2026-01-05")
+    # inject a known upward price path
+    up = _prices("2026-01-02", 120, drift=0.002)
+    flat = _prices("2026-01-02", 120, drift=0.0)
+    ledger.evaluate(lambda tk: up if tk == "AAA" else flat)
+    cal = ledger.calibration(min_n=1)
+    assert cal["available"]
+    dip = next(t for t in cal["type_stats"] if t["signal_type"] == "dip_buy")
+    assert dip["avg_dir_return_21d"] > 0  # upward path -> positive realized
+
+
+def test_ledger_calibration_empty():
+    cal = ledger.calibration()
+    assert cal["available"] is False
+
+
+# ---------- risk ----------
+def _ohlc(n=60):
+    c = np.linspace(100, 110, n)
+    return pd.DataFrame({"high": c * 1.02, "low": c * 0.98, "close": c},
+                        index=pd.bdate_range("2026-01-02", periods=n))
+
+
+def test_atr_and_sizing():
+    s = risk.size_position(5000, 110, _ohlc())
+    assert s["available"]
+    assert s["shares"] > 0 and s["stop_price"] < 110
+    assert s["dollar_risk"] == pytest.approx(50.0)  # 1% of 5000
+
+
+def test_kelly_positive_and_negative():
+    pos = risk.kelly(0.6, 2.0, fraction=0.25)
+    assert pos["full_kelly_pct"] > 0 and pos["fractional_pct"] == pytest.approx(pos["full_kelly_pct"] * 0.25, abs=0.1)
+    neg = risk.kelly(0.3, 1.0)
+    assert neg["full_kelly_pct"] < 0 and "ZERO" in neg["note"]
+
+
+def test_portfolio_heat_flag():
+    pos = [{"ticker": "A", "shares": 10, "entry": 100, "stop": 90},
+           {"ticker": "B", "shares": 5, "entry": 200, "stop": 180}]
+    h = risk.portfolio_heat(pos, 5000)
+    assert h["heat_pct"] == pytest.approx((10 * 10 + 5 * 20) / 5000 * 100, abs=0.1)
+
+
+def test_concentration_flags_single_and_theme():
+    w = {"NVDA": 0.16, "AVGO": 0.10, "TSM": 0.18, "AAPL": 0.05}
+    c = risk.concentration(w, {"AI/Semis": ["NVDA", "AVGO", "TSM"]})
+    assert "NVDA" in c["over_single_name"] and "TSM" in c["over_single_name"]
+    assert c["over_theme"]  # 0.16+0.10+0.18 = 0.44 > 0.40
+
+
+# ---------- insiders ----------
+def test_insider_cluster_detected():
+    def mock(tk):
+        return [{"filed": "2026-06-10", "display_names": ["X (CEO)"], "is_purchase": True},
+                {"filed": "2026-06-09", "display_names": ["Y (CFO)"], "is_purchase": True},
+                {"filed": "2026-06-08", "display_names": ["Z (Director)"], "is_purchase": True}]
+    insiders._CACHE.clear()
+    out = insiders.analyze("TEST", fetch_form4=mock)
+    assert out["available"] and out["cluster"] is True
+    assert out["n_insiders_21d"] == 3 and out["csuite_filings"] == 2
+
+
+def test_insider_no_data_degrades():
+    insiders._CACHE.clear()
+    out = insiders.analyze("TEST", fetch_form4=lambda tk: [])
+    assert out["available"] is False

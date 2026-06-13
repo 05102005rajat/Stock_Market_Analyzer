@@ -83,8 +83,8 @@ def analyze(df: pd.DataFrame) -> dict:
     """Today's gap state + this stock's own gap base rates. Needs daily OHLC
     with an 'open' column (the app's standard fetch includes it)."""
     need = {"open", "high", "low", "close"}
-    if not need.issubset(df.columns) or len(df) < 120:
-        return {"available": False, "reason": "need >=120 daily bars with open prices"}
+    if not need.issubset(df.columns) or len(df) < 121:
+        return {"available": False, "reason": "need 120+ daily bars of history with open prices"}
 
     o = df["open"].astype(float).to_numpy()
     h = df["high"].astype(float).to_numpy()

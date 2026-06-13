@@ -432,6 +432,21 @@ def analyze_portfolio(holdings: list[dict] | None = None, cash: float | None = N
     for r in rows:
         r["weight"] = round(r.get("value", 0) / total_value * 100, 1) if total_value else 0
 
+    lt = look_through(rows, cash)
+
+    # Concentration with look-through theme detection (the real risk for a
+    # small AI-heavy book): single-name >10%, theme >40%.
+    from services import risk as _risk
+    weights = {}
+    for e in (lt.get("effective") or []):
+        weights[e.get("ticker", e.get("name", "?"))] = e.get("pct", e.get("weight", 0)) / 100.0
+    THEMES = {
+        "AI / Semiconductors": ["NVDA", "AVGO", "TSM", "MU", "AMD", "QCOM", "AMAT",
+                                 "LRCX", "ASML", "MRVL", "SNDK", "INTC", "SMCI"],
+        "Mega-cap Tech": ["AAPL", "MSFT", "GOOGL", "GOOG", "AMZN", "META", "NVDA"],
+    }
+    concentration = _risk.concentration(weights, THEMES)
+
     return {
         "holdings": rows,
         "watchlist": watch,
@@ -445,8 +460,9 @@ def analyze_portfolio(holdings: list[dict] | None = None, cash: float | None = N
             "total_gain_pct": round((invested / invested_cost - 1) * 100, 2) if invested_cost else None,
             "positions": len([r for r in rows if r.get("value")]),
         },
-        "look_through": look_through(rows, cash),
+        "look_through": lt,
         "risk": portfolio_weekly_vol(rows),
+        "concentration": concentration,
         "fees": portfolio_fees(rows, invested),
         "drawdown": portfolio_drawdown(rows, invested, cash),
         "disclaimer": "Descriptive analytics — concentration & risk measurement, not return predictions or advice.",

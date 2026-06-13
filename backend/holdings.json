@@ -1,21 +1,24 @@
 {
-  "_comment": "Reconstructed from positions screenshot, 2026-06-04 (~1:43 AM). VOO/WMT/GOOGL/VST + cash assumed unchanged (below the fold; confirm in-app). MU position DOUBLED to ~$2,500 — now by far the largest holding. AI-semi basket selling off.",
-  "cash": 2.0,
+  "_comment": "Updated from positions screenshot 2026-06-12 (full account). Rajat executed the rotation: MU concentration GONE, financials (XLF) + healthcare (UNH) added, index core rebuilt (VTI/VIG/SCHD). Stocks $4,924.48, cash $63.36. Still semi-heavy via NVDA + QQQM look-through + AVGO + TSM, but no longer a single-name bet. Sorted by equity.",
+  "cash": 63.36,
   "holdings": [
-    { "ticker": "MU",    "shares": 2.403, "avg_cost": 1055.40 },
-    { "ticker": "VOO",   "shares": 2.432, "avg_cost": 695.15 },
-    { "ticker": "QQQM",  "shares": 2.422, "avg_cost": 308.00 },
-    { "ticker": "NVDA",  "shares": 2.8,   "avg_cost": 222.43 },
-    { "ticker": "AVGO",  "shares": 1.305, "avg_cost": 486.91 },
-    { "ticker": "SNDK",  "shares": 0.271, "avg_cost": 1731.71 },
-    { "ticker": "GOOGL", "shares": 1.086, "avg_cost": 383.36 },
-    { "ticker": "WMT",   "shares": 3.085, "avg_cost": 115.58 },
-    { "ticker": "PANW",  "shares": 1.0,   "avg_cost": 300.50 },
+    { "ticker": "QQQM",  "shares": 2.715, "avg_cost": 305.80 },
+    { "ticker": "NVDA",  "shares": 3.92,  "avg_cost": 216.03 },
+    { "ticker": "VIG",   "shares": 2.0,   "avg_cost": 235.56 },
+    { "ticker": "TSM",   "shares": 1.0,   "avg_cost": 430.00 },
+    { "ticker": "UNH",   "shares": 1.0,   "avg_cost": 408.11 },
+    { "ticker": "VTI",   "shares": 1.0,   "avg_cost": 366.00 },
+    { "ticker": "SCHD",  "shares": 10.0,  "avg_cost": 32.30 },
+    { "ticker": "AAPL",  "shares": 1.0,   "avg_cost": 293.00 },
+    { "ticker": "AMZN",  "shares": 1.0,   "avg_cost": 238.60 },
+    { "ticker": "XLF",   "shares": 4.0,   "avg_cost": 53.28 },
+    { "ticker": "MNST",  "shares": 2.0,   "avg_cost": 94.87 },
+    { "ticker": "XLI",   "shares": 1.009, "avg_cost": 172.97 },
+    { "ticker": "AVGO",  "shares": 0.305, "avg_cost": 478.42 },
     { "ticker": "MSFT",  "shares": 0.132, "avg_cost": 458.72 },
     { "ticker": "CEG",   "shares": 0.074, "avg_cost": 284.82 },
-    { "ticker": "VST",   "shares": 0.125, "avg_cost": 159.76 },
     { "ticker": "DLR",   "shares": 0.053, "avg_cost": 190.21 },
     { "ticker": "QQQ",   "shares": 0.004, "avg_cost": 745.45 }
   ],
-  "watchlist": ["SPY", "AMZN", "TSLA", "META", "AMD", "XLE", "XLU", "NBIS"]
+  "watchlist": ["SPY", "ORCL", "XLV", "XLE", "NBIS", "VST", "JPM", "GOOGL"]
 }
