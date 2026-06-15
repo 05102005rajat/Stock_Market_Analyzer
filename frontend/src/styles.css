@@ -508,3 +508,13 @@ table.bt td:first-child { display: flex; align-items: center; gap: 6px; }
   .dual-charts { flex-direction: row; }
   .dual-chart-pane { flex: 1 1 50%; min-width: 0; }
 }
+
+/* Forecast track record */
+.fc-record-btn { margin-top: 8px; width: 100%; }
+.fc-record { margin-top: 10px; }
+.fc-record-headline { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+.fc-bignum { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.fc-bignum.pos { color: #26a69a; } .fc-bignum.neg { color: #ef5350; }
+
+/* Split-view separator label */
+.split-sep { margin-left: 8px; color: #94a3b8; font-size: 12px; align-self: center; }

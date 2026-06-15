@@ -44,3 +44,9 @@ export async function getScan(horizon = "1m") {
   if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);
   return body;
 }
+
+export async function getForecastRecord(ticker, horizon = 10) {
+  const res = await fetch(`/api/forecast-record?ticker=${encodeURIComponent(ticker)}&horizon=${horizon}`);
+  if (!res.ok) throw new Error("forecast record request failed");
+  return res.json();
+}

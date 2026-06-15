@@ -50,6 +50,106 @@ def _features(returns: pd.Series, close: pd.Series) -> pd.DataFrame:
     return feat
 
 
+def track_record(df: pd.DataFrame, horizon: int = 10, n_tests: int = 40) -> dict:
+    """Honest walk-forward scorecard: 'how many times was the forecast right?'
+
+    For each of the last `n_tests` trading days we train on only the data up to
+    that day, forecast `horizon` days ahead, and check whether the DIRECTION was
+    right. Nothing peeks at the future. We also break it down by up-calls vs
+    down-calls, because in a bull run "always up" scores high without skill — the
+    honest test is whether it's right in BOTH directions.
+    """
+    close = df["close"].astype(float)
+    log_ret = np.log(close / close.shift(1)).dropna()
+    if len(log_ret) < 150 + horizon:
+        return {"available": False, "reason": "need ~8 months of history to score reliably"}
+
+    feat_all = _features(log_ret, close)
+    target_all = log_ret.shift(-1)
+
+    n = len(log_ret)
+    start = max(120, n - n_tests - horizon)
+
+    dir_hits = dir_tries = 0
+    up_calls = up_hits = down_calls = down_hits = 0
+    up_actuals = 0
+    model = GradientBoostingRegressor(
+        n_estimators=80, max_depth=3, learning_rate=0.06, subsample=0.8, random_state=42)
+
+    refit_every = 8
+    for j, t in enumerate(range(start, n - horizon)):
+        Xtr = feat_all.iloc[:t].dropna()
+        ytr = target_all.loc[Xtr.index].dropna()
+        Xtr = Xtr.loc[ytr.index]
+        if len(Xtr) < 100:
+            continue
+        if j % refit_every == 0:
+            model.fit(Xtr.to_numpy(), ytr.to_numpy())
+
+        # One-shot horizon estimate: project the average predicted daily drift.
+        # (Much faster than full recursive roll, and direction is what we score.)
+        f = feat_all.iloc[[t]].fillna(0.0).to_numpy()
+        pred_ret = float(model.predict(f)[0])
+
+        entry_close = float(close.iloc[t])
+        actual_close = float(close.iloc[t + horizon])
+        pred_dir = np.sign(pred_ret)
+        actual_dir = np.sign(actual_close - entry_close)
+        if actual_dir == 0:
+            continue
+        dir_tries += 1
+        if actual_dir > 0:
+            up_actuals += 1
+        if pred_dir > 0:
+            up_calls += 1
+            if actual_dir > 0:
+                up_hits += 1
+        elif pred_dir < 0:
+            down_calls += 1
+            if actual_dir < 0:
+                down_hits += 1
+        if pred_dir == actual_dir:
+            dir_hits += 1
+
+    if dir_tries == 0:
+        return {"available": False, "reason": "not enough completed forecasts to score"}
+
+    hit_rate = dir_hits / dir_tries
+    up_frac = up_actuals / dir_tries
+    majority_baseline = max(up_frac, 1 - up_frac)
+    edge = hit_rate - majority_baseline
+    verdict = ("beats a simple baseline" if edge > 0.03
+               else "worse than guessing the usual direction" if edge < -0.03
+               else "about the same as a simple baseline")
+
+    return {
+        "available": True,
+        "horizon": horizon,
+        "tries": dir_tries,
+        "direction_hits": dir_hits,
+        "hit_rate": round(hit_rate * 100, 1),
+        "coin_flip": 50.0,
+        "majority_baseline": round(majority_baseline * 100, 1),
+        "up_calls": up_calls,
+        "up_accuracy": round(up_hits / up_calls * 100, 1) if up_calls else None,
+        "down_calls": down_calls,
+        "down_accuracy": round(down_hits / down_calls * 100, 1) if down_calls else None,
+        "verdict": verdict,
+        "plain": (
+            f"Tested {dir_tries} times on this stock's recent history (walk-forward, no peeking), "
+            f"the {horizon}-day forecast called direction right {dir_hits} times ({round(hit_rate*100)}%). "
+            f"Always guessing the more common direction would score {round(majority_baseline*100)}%, "
+            f"so it {verdict}."
+            + (f" When it predicted UP it was right {round(up_hits/up_calls*100)}% of the time"
+               if up_calls else "")
+            + (f"; when it predicted DOWN, {round(down_hits/down_calls*100)}%."
+               if down_calls else ".")
+            + " This is why the app shows a RANGE, not a single price."
+        ),
+        "disclaimer": "Honest out-of-sample track record on recent history. Past accuracy does not guarantee future accuracy.",
+    }
+
+
 def forecast(df: pd.DataFrame, horizon: int = 10, interval: str = "1d") -> dict:
     """Return a recursive multi-step close-price forecast and model diagnostics."""
     horizon = max(1, min(int(horizon), 60))

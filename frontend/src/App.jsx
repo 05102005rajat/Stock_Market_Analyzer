@@ -19,6 +19,7 @@ const INTERVALS = [
   ["1wk", "Weekly"],
   ["1mo", "Monthly"],
 ];
+const INTERVAL_LABEL = Object.fromEntries(INTERVALS);
 // Sensible default span when switching to a coarser candle interval.
 const DEFAULT_PERIOD_FOR_INTERVAL = { "1h": "1mo", "1d": "1y", "1wk": "2y", "1mo": "max" };
 const TOGGLE_DEFS = [
@@ -56,6 +57,8 @@ export default function App() {
   const [plainMode, setPlainMode] = useState(() => {
     try { return localStorage.getItem("plainMode") === "1"; } catch { return false; }
   });
+  const [splitTf, setSplitTf] = useState(null); // second timeframe interval, e.g. "1wk"
+  const [splitData, setSplitData] = useState(null);
   const togglePlain = () => setPlainMode((v) => {
     const nv = !v;
     try { localStorage.setItem("plainMode", nv ? "1" : "0"); } catch { /* ignore */ }
@@ -94,10 +97,11 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const run = async (e, tickerOverride) => {
+  const run = async (e, tickerOverride, splitOverride) => {
     e?.preventDefault();
     const tk = (tickerOverride || ticker).trim();
     if (!tk) return;
+    const effectiveSplit = splitOverride !== undefined ? splitOverride : splitTf;
     setLoading(true);
     setError(null);
     const safeHorizon = Math.min(60, Math.max(1, Number.isFinite(horizon) ? horizon : 10));
@@ -114,6 +118,17 @@ export default function App() {
         }
       } else {
         setCompareData(null);
+      }
+      // Split timeframe: same ticker, a second interval, side-by-side.
+      if (effectiveSplit) {
+        try {
+          const splitPeriod = DEFAULT_PERIOD_FOR_INTERVAL[effectiveSplit] || "2y";
+          setSplitData(await analyze({ ticker: tk, period: splitPeriod, interval: effectiveSplit, horizon: safeHorizon }));
+        } catch {
+          setSplitData(null);
+        }
+      } else {
+        setSplitData(null);
       }
     } catch (err) {
       setError(err.message);
@@ -347,6 +362,26 @@ export default function App() {
                   {label}
                 </button>
               ))}
+              <span className="split-sep" title="Show a second chart of the SAME stock at another timeframe, side by side">
+                Split view:
+              </span>
+              {[["1d", "+Daily"], ["1wk", "+Weekly"], ["1mo", "+Monthly"]]
+                .filter(([iv]) => iv !== interval)
+                .map(([iv, label]) => (
+                  <button
+                    key={iv}
+                    className={`chip mini-chip ${splitTf === iv ? "on" : ""}`}
+                    onClick={() => {
+                      const next = splitTf === iv ? null : iv;
+                      setSplitTf(next);
+                      if (!next) setSplitData(null);
+                      else run(null, ticker, next);
+                    }}
+                    title={`Add a ${label.replace("+", "")} chart of ${ticker} beside the current one`}
+                  >
+                    {label}
+                  </button>
+                ))}
             </div>
           </div>
 
@@ -360,7 +395,18 @@ export default function App() {
           )}
           <div className="layout">
             <main className="main">
-              {compareData ? (
+              {splitData ? (
+                <div className="dual-charts">
+                  <div className="dual-chart-pane">
+                    <div className="dual-chart-label">{data.ticker} · {INTERVAL_LABEL[interval] || interval}</div>
+                    <PriceChart data={data} toggles={toggles} focus={focus} intraday={interval === "1h"} />
+                  </div>
+                  <div className="dual-chart-pane">
+                    <div className="dual-chart-label">{splitData.ticker} · {INTERVAL_LABEL[splitTf] || splitTf}</div>
+                    <PriceChart data={splitData} toggles={toggles} focus={null} intraday={splitTf === "1h"} />
+                  </div>
+                </div>
+              ) : compareData ? (
                 <div className="dual-charts">
                   <div className="dual-chart-pane">
                     <div className="dual-chart-label">{data.ticker}</div>

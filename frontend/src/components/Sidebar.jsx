@@ -17,6 +17,7 @@ import ExtensionCard from "./ExtensionCard";
 import Checklist from "./Checklist";
 import PatternRead from "./PatternRead";
 import LivePrice from "./LivePrice";
+import ForecastRecord from "./ForecastRecord";
 import InsiderCard from "./InsiderCard";
 import SizingCard from "./SizingCard";
 
@@ -227,6 +228,7 @@ export default function Sidebar({ data, focus, onFocus, plainMode = false }) {
               </div>
             )}
             <p className="muted small">{forecast.disclaimer}</p>
+            <ForecastRecord ticker={data.ticker} horizon={forecast.horizon} />
           </>
         ) : (
           <p className="muted small">{forecast?.reason || "Unavailable."}</p>

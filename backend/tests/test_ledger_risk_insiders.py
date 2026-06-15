@@ -137,3 +137,33 @@ def test_insider_no_data_degrades():
     insiders._CACHE.clear()
     out = insiders.analyze("NONE", fetch_transactions=lambda tk: [])
     assert out["available"] is False
+
+
+# ---------- forecast track record ----------
+def test_track_record_scores_and_breaks_down():
+    from services import forecast
+    import numpy as np
+    import pandas as pd
+    # build a trending series with noise (enough history)
+    n = 400
+    idx = pd.bdate_range("2024-06-01", periods=n)
+    rng = np.random.default_rng(0)
+    close = 100 * np.exp(np.cumsum(rng.normal(0.001, 0.02, n)))
+    df = pd.DataFrame({"high": close * 1.01, "low": close * 0.99, "close": close,
+                       "open": close}, index=idx)
+    r = forecast.track_record(df, horizon=10, n_tests=30)
+    assert r["available"]
+    assert 0 <= r["hit_rate"] <= 100
+    assert r["tries"] > 0 and r["direction_hits"] <= r["tries"]
+    assert "plain" in r and r["majority_baseline"] >= 50
+
+
+def test_track_record_insufficient_history():
+    from services import forecast
+    import pandas as pd
+    import numpy as np
+    idx = pd.bdate_range("2026-01-01", periods=50)
+    close = np.linspace(100, 110, 50)
+    df = pd.DataFrame({"high": close, "low": close, "close": close, "open": close}, index=idx)
+    r = forecast.track_record(df, horizon=10)
+    assert r["available"] is False

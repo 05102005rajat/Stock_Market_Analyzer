@@ -95,6 +95,31 @@ def api_quote(ticker):
     return jsonify(quotes_engine.fetch(ticker))
 
 
+_FC_RECORD_CACHE = {}
+
+
+@app.get("/api/forecast-record")
+def api_forecast_record():
+    """Walk-forward forecast accuracy ('how many times was it right?'). Cached
+    per ticker+horizon for 6h since it retrains models and is slow."""
+    ticker = (request.args.get("ticker") or "").strip().upper()
+    horizon = int(request.args.get("horizon", 10))
+    if not ticker:
+        return jsonify({"error": "ticker required"}), 400
+    key = f"{ticker}:{horizon}"
+    import time as _t
+    hit = _FC_RECORD_CACHE.get(key)
+    if hit and _t.time() - hit[0] < 6 * 3600:
+        return jsonify(hit[1])
+    try:
+        df = data.fetch_ohlcv(ticker, period="2y", interval="1d")
+        rec = forecast.track_record(df, horizon=horizon)
+    except Exception as e:
+        return jsonify({"available": False, "reason": str(e)}), 200
+    _FC_RECORD_CACHE[key] = (_t.time(), rec)
+    return jsonify(rec)
+
+
 @app.get("/api/ledger")
 def api_ledger():
     """The signal ledger's recent entries + live calibration scoreboard."""
