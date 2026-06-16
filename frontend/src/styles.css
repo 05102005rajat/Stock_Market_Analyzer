@@ -518,3 +518,17 @@ table.bt td:first-child { display: flex; align-items: center; gap: 6px; }
 
 /* Split-view separator label */
 .split-sep { margin-left: 8px; color: #94a3b8; font-size: 12px; align-self: center; }
+
+/* Pro chart polish: live OHLC legend overlay */
+.chart-wrap { position: relative; }
+.chart-legend {
+  position: absolute; top: 8px; left: 12px; z-index: 4; pointer-events: none;
+  font-size: 12px; font-variant-numeric: tabular-nums; letter-spacing: .2px;
+  display: flex; gap: 12px; align-items: baseline;
+  text-shadow: 0 1px 4px rgba(0,0,0,.6);
+}
+.chart-legend .leg-tkr { font-weight: 700; font-size: 13px; color: #e6edf3; }
+.chart-legend .leg-ohlc { color: #8b949e; }
+.chart-legend .leg-ohlc b { color: #c9d1d9; font-weight: 600; margin-left: 1px; margin-right: 2px; }
+.chart-legend .up { color: #0bce8b; }
+.chart-legend .down { color: #f6465d; }

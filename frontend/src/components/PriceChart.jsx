@@ -12,8 +12,10 @@ import { createChart, LineStyle, ColorType } from "lightweight-charts";
 // align on one time scale.
 export default function PriceChart({ data, toggles, focus, intraday = false }) {
   const containerRef = useRef(null);
+  const legendRef = useRef(null);
   const chartRef = useRef(null);
   const candleRef = useRef(null);
+  const volumeRef = useRef(null);
   // Tracks overlays we added and which chart instance they belong to, so we can
   // remove them on toggle without touching a disposed chart on a data change.
   const overlaysRef = useRef({ chart: null, series: [], priceLines: [] });
@@ -25,52 +27,59 @@ export default function PriceChart({ data, toggles, focus, intraday = false }) {
 
     const chart = createChart(containerRef.current, {
       layout: {
-        background: { type: ColorType.Solid, color: "#0e1117" },
-        textColor: "#c9d1d9",
+        background: { type: ColorType.Solid, color: "#0d1015" },
+        textColor: "#b3bdc9",
         fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
-        fontSize: 12,
+        fontSize: 11,
       },
-      grid: { vertLines: { color: "#161b26" }, horzLines: { color: "#161b26" } },
+      grid: {
+        vertLines: { color: "rgba(70,80,95,0.10)" },
+        horzLines: { color: "rgba(70,80,95,0.10)" },
+      },
       rightPriceScale: {
-        borderColor: "#30363d",
-        scaleMargins: { top: 0.08, bottom: 0.12 },
+        borderColor: "rgba(70,80,95,0.4)",
+        scaleMargins: { top: 0.10, bottom: 0.28 }, // leave room for volume pane
         entireTextOnly: true,
       },
       timeScale: {
-        borderColor: "#30363d",
+        borderColor: "rgba(70,80,95,0.4)",
         timeVisible: intraday,
         secondsVisible: false,
-        rightOffset: 6,
-        barSpacing: 8,
+        rightOffset: 8,
+        barSpacing: 11,
+        minBarSpacing: 4,
       },
       crosshair: {
         mode: 1, // magnet — snaps to candles like TradingView
-        vertLine: { color: "#4f9eff88", width: 1, style: LineStyle.Dashed,
+        vertLine: { color: "rgba(120,160,230,0.5)", width: 1, style: LineStyle.Solid,
                     labelBackgroundColor: "#1f6feb" },
-        horzLine: { color: "#4f9eff88", width: 1, style: LineStyle.Dashed,
+        horzLine: { color: "rgba(120,160,230,0.5)", width: 1, style: LineStyle.Solid,
                     labelBackgroundColor: "#1f6feb" },
       },
       watermark: {
         visible: true,
         text: data.ticker || "",
-        fontSize: 56,
-        color: "rgba(120,140,180,0.06)",
+        fontSize: 64,
+        fontFamily: "'Inter', sans-serif",
+        color: "rgba(120,140,180,0.05)",
         horzAlign: "center",
         vertAlign: "center",
       },
-      height: 460,
+      height: 480,
       autoSize: true,
     });
 
+    // Crisper candles: thin clean borders, brighter wicks, TradingView-like greens/reds.
     const candleSeries = chart.addCandlestickSeries({
-      upColor: "#26a69a",
-      downColor: "#ef5350",
-      borderUpColor: "#26a69a",
-      borderDownColor: "#ef5350",
-      wickUpColor: "#26a69a",
-      wickDownColor: "#ef5350",
-      priceLineColor: "#4f9eff",
+      upColor: "#0bce8b",
+      downColor: "#f6465d",
+      borderUpColor: "#0bce8b",
+      borderDownColor: "#f6465d",
+      wickUpColor: "#5fd6ad",
+      wickDownColor: "#ff7a8a",
+      priceLineColor: "rgba(120,160,230,0.6)",
       priceLineStyle: LineStyle.Dotted,
+      priceLineWidth: 1,
     });
     candleSeries.setData(
       data.candles.map((c) => ({
@@ -82,9 +91,54 @@ export default function PriceChart({ data, toggles, focus, intraday = false }) {
       }))
     );
 
+    // Volume histogram in its own bottom pane, colored by up/down day.
+    const volumeSeries = chart.addHistogramSeries({
+      priceFormat: { type: "volume" },
+      priceScaleId: "vol",
+      color: "#3a4250",
+    });
+    chart.priceScale("vol").applyOptions({
+      scaleMargins: { top: 0.80, bottom: 0 },
+    });
+    if (data.candles.some((c) => c.volume != null)) {
+      volumeSeries.setData(
+        data.candles.map((c) => ({
+          time: c.time,
+          value: c.volume || 0,
+          color: c.close >= c.open ? "rgba(11,206,139,0.45)" : "rgba(246,70,93,0.45)",
+        }))
+      );
+    }
+
     chartRef.current = chart;
     candleRef.current = candleSeries;
+    volumeRef.current = volumeSeries;
     chart.timeScale().fitContent();
+
+    // Live OHLC legend that updates as the crosshair moves (the readout Legend shows).
+    const legendEl = legendRef.current;
+    const fmt = (v) => (v == null ? "—" : v.toFixed(2));
+    const renderLegend = (c) => {
+      if (!legendEl || !c) return;
+      const up = c.close >= c.open;
+      const arrow = up ? "▲" : "▼";
+      const cls = up ? "up" : "down";
+      legendEl.innerHTML =
+        `<span class="leg-tkr">${data.ticker}</span>` +
+        `<span class="leg-ohlc">O<b>${fmt(c.open)}</b> H<b>${fmt(c.high)}</b> ` +
+        `L<b>${fmt(c.low)}</b> C<b class="${cls}">${fmt(c.close)}</b> ` +
+        `<span class="${cls}">${arrow}</span></span>`;
+    };
+    const lastBar = data.candles[data.candles.length - 1];
+    renderLegend(lastBar);
+    chart.subscribeCrosshairMove((param) => {
+      if (!param || !param.time || !param.seriesData) {
+        renderLegend(lastBar);
+        return;
+      }
+      const bar = param.seriesData.get(candleSeries);
+      renderLegend(bar || lastBar);
+    });
 
     const onResize = () => chart.timeScale().fitContent();
     window.addEventListener("resize", onResize);
@@ -93,6 +147,7 @@ export default function PriceChart({ data, toggles, focus, intraday = false }) {
       chart.remove();
       chartRef.current = null;
       candleRef.current = null;
+      volumeRef.current = null;
     };
   }, [data, intraday]);
 
@@ -132,13 +187,13 @@ export default function PriceChart({ data, toggles, focus, intraday = false }) {
     const ind = data.indicators;
 
     if (toggles.ma) {
-      addLine(ind.sma20, "#f0b90b", 1.5, LineStyle.Solid, "SMA20");
-      addLine(ind.sma50, "#4f9eff", 1.5, LineStyle.Solid, "SMA50");
+      addLine(ind.sma20, "#ffb01f", 1.5, LineStyle.Solid, "SMA20");
+      addLine(ind.sma50, "#3b9dff", 1.5, LineStyle.Solid, "SMA50");
     }
     if (toggles.bollinger) {
-      addLine(ind.bb_upper, "#8b949e", 1, LineStyle.Dashed);
-      addLine(ind.bb_mid, "#8b949e", 1, LineStyle.Dotted);
-      addLine(ind.bb_lower, "#8b949e", 1, LineStyle.Dashed);
+      addLine(ind.bb_upper, "#9aa4b2", 1, LineStyle.Dashed);
+      addLine(ind.bb_mid, "#9aa4b2", 1, LineStyle.Dotted);
+      addLine(ind.bb_lower, "#9aa4b2", 1, LineStyle.Dashed);
     }
 
     // Guard: a 1-bar history yields start===end (equal times), which crashes
@@ -283,5 +338,10 @@ export default function PriceChart({ data, toggles, focus, intraday = false }) {
     }
   }, [focus, data]);
 
-  return <div className="chart" ref={containerRef} />;
+  return (
+    <div className="chart-wrap">
+      <div className="chart-legend" ref={legendRef} />
+      <div className="chart" ref={containerRef} />
+    </div>
+  );
 }
