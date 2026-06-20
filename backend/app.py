@@ -10,6 +10,8 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 from services import (
+    conviction as conviction_engine,
+    crossover as crossover_engine,
     analysts as analysts_engine,
     backtest,
     candlesticks,
@@ -215,6 +217,7 @@ def analyze():
         pros = analysts_engine.snapshot(ticker, daily)
         gap = gaps_engine.analyze(daily)
         ext = extension_engine.analyze(daily)
+        cross = crossover_engine.analyze(daily)
         heads = news_engine.headlines(ticker)
         pread = pattern_read_engine.analyze(daily, chart_patterns=pat["patterns"])
         quote = quotes_engine.fetch(ticker)
@@ -228,6 +231,10 @@ def analyze():
     except Exception as e:
         return jsonify({"error": f"Analysis failed: {e}"}), 500
 
+    conv = conviction_engine.assess({
+        "relativeStrength": rs, "minervini": mino,
+        "insider": insider, "earningsWatch": earn, "crossover": cross,
+    })
     payload = (
         {
             "ticker": ticker.upper(),
@@ -257,6 +264,8 @@ def analyze():
             "pros": pros,
             "gap": gap,
             "extension": ext,
+            "crossover": cross,
+            "conviction": conv,
             "headlines": heads,
             "checklist": checklist,
             "patternRead": pread,

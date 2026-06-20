@@ -1,270 +1,160 @@
-# 📈 Stock Pattern & Trend Analyzer
+# Evidence-Based Stock Analysis
 
-Enter a ticker → get live price data, technical indicators, automatically
-detected chart patterns, trend classification, support/resistance levels, and a
-short-horizon machine-learning price forecast — all on one interactive chart.
+A personal stock-analysis web app that does something most stock tools refuse to do: **it tells you honestly how much each signal is actually worth.** Every indicator is labeled by how well it holds up in rigorous, out-of-sample testing — and the app keeps a live scoreboard (the Signal Ledger) that scores its own calls forward against the market, so you can see what works instead of trusting a confident-looking arrow.
 
-> ⚠️ Educational tool only. Nothing here is investment advice.
+> **Not financial advice.** This is an educational tool. It describes price history and surfaces research-backed signals; it does not predict the future, and no signal here is a recommendation to buy or sell. Individual-stock outcomes over short horizons are dominated by noise.
 
-## Stack
+---
 
-| Layer    | Tech |
-|----------|------|
-| Data     | [yfinance](https://github.com/ranaroussi/yfinance) (Yahoo Finance) |
-| Backend  | Flask + pandas / numpy / scipy / scikit-learn |
-| Frontend | React + Vite + TradingView [lightweight-charts](https://github.com/tradingview/lightweight-charts) |
+## The one idea behind the whole app
 
-## Buy Zones (entry scanner, NOT a winner picker)
+Most charting tools present every indicator with equal confidence — a MACD cross looks as authoritative as an insider buying $2M of stock. The research says they are nowhere near equal. So this app sorts everything into two buckets and never lets you forget which is which:
 
-A **Buy Zones** mode ranks a fixed universe (your holdings + watchlist + curated
-liquid names) by a transparent "buy-the-dip-in-an-uptrend" rule — oversold RSI
-*gated* behind a 200-DMA uptrend + positive relative strength — and attaches a
-calibrated buy zone / take-profit / stop / green-exit odds to each.
+- **Descriptive** signals summarize what price has *already* done (moving averages, MACD, RSI, Bollinger Bands, support/resistance, candlesticks). They are accurate descriptions and weak-to-useless predictors.
+- **Predictive** signals have a real, replicated, out-of-sample edge with an economic mechanism behind them (momentum/relative strength, opportunistic insider buying, post-earnings drift, value, quality).
 
-**It does not predict winners, and the app says so loudly.** Backtested
-point-in-time (`scanner_backtest.py`, 28 names, 5y): the top-5 by setup score beat
-buy-and-hold by only +0.43%/pick at 21d (t = 1.41, *not* significant), and at 5d
-the bottom-5 beat the top-5. So it's an **entry-discipline / position-timing**
-tool for names you already want — never a "5 stocks that will go up" oracle,
-because direction is a coin flip.
+The flagship feature, the **Signal Ledger**, logs every directional call the app makes and scores it forward versus SPY at 5/21/63 days. Trust the scoreboard, not the label.
 
-## My Portfolio (look-through X-ray)
+### Evidence hierarchy (what the app believes, and why)
 
-A **Portfolio** mode (toggle in the header) reads your holdings from
-`backend/holdings.json` (ticker, shares, average cost) and shows what you own,
-cost vs current value and P/L, a light per-holding read (trend + the weekly
-vol-scaled target), and — the headline — an **ETF look-through X-ray**: it
-resolves VOO/QQQ/SPYM into their constituents so you see your *true* single-name
-exposure. (On the sample book: direct weights suggest ~36% in individual stocks,
-but look-through reveals the true top-3 — GOOGL/AAPL/NVDA — is **~47%** of the
-account and mega-cap tech **~57%**.) Plus portfolio volatility (correlation-aware).
-Click any holding to jump to its full single-stock analysis. Purely descriptive —
-concentration and risk *measurement*, never return predictions.
+| Signal | Descriptive or Predictive | Evidence | Where in the app |
+|---|---|---|---|
+| Momentum / relative strength | Predictive | **Strong** (Jegadeesh-Titman 1993; replicated 40+ markets) | Conviction Stack, Relative Strength |
+| Opportunistic insider buying | Predictive | **Strong** (Cohen-Malloy-Pomorski 2012, ~82 bps/mo) | Insider card, Conviction Stack |
+| Post-earnings-announcement drift | Predictive | **Strong** (Bernard-Thomas) | Earnings posture |
+| Short-term mean reversion (oversold dip in uptrend) | Predictive | **Moderate** (regime-dependent) | Dip-buy card |
+| Trend stage (Minervini template) | Predictive-ish | **Moderate** (a momentum read) | Conviction Stack, Minervini |
+| ATR / volatility (for stops & sizing) | Descriptive | **Strong for its job** (no direction claim) | Sizing, Risk |
+| Moving averages, golden/death cross | Descriptive | **Weak** as predictor | Chart, Trends |
+| EMA/MACD crossover | Descriptive | **Weak** (~coin-flip after costs) | Crossover card |
+| RSI, Bollinger Bands | Descriptive | **Weak** | Indicator panel |
+| Support/Resistance, breakouts | Claimed predictive | **Weak** (high false-breakout rate) | Resistance card |
+| Chart patterns (H&S, double top, cup&handle) | Claimed predictive | **Weak** (success rates overstated) | Pattern read |
+| Candlestick patterns | Claimed predictive | **None demonstrated** | Candlesticks |
 
-## Headline: technical posture (honestly measured)
+Key sources: Sullivan-Timmermann-White (1999), Park-Irwin (2007), Lo-Mamaysky-Wang (2000), Jegadeesh-Titman (1993), Cohen-Malloy-Pomorski (2012), McLean-Pontiff (2016).
 
-A composite **posture** score on −100…+100 (Strongly Bearish … Strongly Bullish)
-that blends every read below (trend, multi-timeframe alignment, 50/200 regime,
-RSI, MACD, Minervini stage, candlesticks, volume, chart patterns, **real relative
-strength vs SPY**) with a confidence interval and a full factor breakdown.
+---
 
-**It describes current structure — it does NOT predict returns, and the app says so.**
-A walk-forward study (`backend/signal_study.py`, 15 large-caps, 5y incl. the 2022
-bear, 4,680 point-in-time samples) found **no forward-return edge**: 20-day returns
-after a bullish posture (+2.1%) were actually *lower* than after a bearish one
-(+2.8%), and a fitted model scored no better than the base rate out-of-sample. That
-finding is surfaced right in the gauge, so posture is never mistaken for a forecast.
-This is the honest result for price-derived signals on liquid large-caps — and the
-tool is built to tell you the truth rather than sell a confident lie.
-
-The **forecast** is likewise framed as a *calibrated range* (the band covers ~95%
-out-of-sample; the centre line does not beat naive on direction — use the cone).
-
-### Weekly trade plan (the part that actually works)
-
-Direction is a coin flip, but the weekly *range* is stable and estimable. The
-**Weekly Trade Plan** asks the better question — "if you buy today, how likely is
-a profitable exit within a week, and at what target?" — from the empirical
-distribution of the 5-day maximum favorable/adverse excursion. Backtested
-point-in-time (`backend/target_backtest.py`, 2,536 samples, 8 tickers):
-
-- a **volatility-scaled take-profit is hit ~64%** of weeks across *every* ticker
-  (SPY's target is +0.9%, NVDA's is +3.2%, yet both hit ~64% — the probability is
-  portable even though the level adapts),
-- a **fixed +3% target is not portable** (67% on NVDA, 15% on SPY),
-- a **profitable exit was available in ~94%** of weeks.
-
-So the app gives a calibrated take-profit / stretch / stop with their historical
-hit rates — a risk/reward framework, not a prediction.
-
-Plus: **compare two tickers** side-by-side, and **alerts** (RSI/price/posture/
-Stage-2/cross conditions) re-checked on an optional 60-second auto-refresh.
-
-> None of this is investment advice — it's a transparent, self-auditing technical study.
-
-### Volatility model (the part that's genuinely predictable)
-
-Direction is a coin flip, but volatility clusters and is forecastable. A blended
-estimator — **50/50 Yang-Zhang(OHLC range) + RiskMetrics EWMA** (`services/volatility.py`)
-— feeds both the forecast bands and the trade plan. Backtested point-in-time
-(`vol_backtest.py`, 8 tickers/5y): **QLIKE 0.41 vs 0.49** for close-to-close
-(~15% better), coverage 94% vs 92.7%.
-
-**Per-stock tail adaptation (not hard-coded categories).** A category study
-(`category_study.py`) showed vol *level* differs 3× across categories (already
-auto-scaled by the blend) and *tail fatness* differs too (kurtosis 0.6 for indices
-→ 3.0 for high-vol growth). So the band multiplier **adapts to each stock's own
-measured 95th-percentile move** (indices ~1.96, fat-tailed names ~2.1+), which
-lands coverage on **95.2%** vs 92.7% — more robust than discrete categories since
-a stock that changes character adapts automatically.
-
-### Evaluation harnesses
-- `backend/validate_week.py` — train-through-Wednesday, test Thu/Fri out-of-sample.
-- `backend/walkforward.py` — point-in-time forecast & signal eval vs naive baselines.
-- `backend/multi_week.py` — rolls the weekly test across N weeks; charts Monday hit rate.
-- `backend/signal_study.py` — multi-ticker, multi-regime component edge diagnosis + walk-forward fit.
-- `backend/target_backtest.py` — weekly trade-plan target calibration.
-- `backend/vol_backtest.py` / `band_backtest.py` / `category_study.py` — volatility model selection, band coverage/sharpness, and per-category tail analysis.
-
-## What it computes
-
-- **Indicators** — SMA 20/50, EMA 12/26, RSI(14), MACD(12,26,9), Bollinger Bands.
-- **Trend** — linear-regression slope of close → uptrend / downtrend / sideways, with an R² confidence.
-- **Multi-timeframe trend** (the "read it like an expert" view) — direction + % change over **1W / 1M / 3M / 6M / 1Y**, an alignment verdict ("every timeframe aligned" vs "choppy"), and the long-term regime via the **50/200-day SMAs** (golden/death cross). Computed from a consistent daily history regardless of the chart's zoom.
-- **Daily / Weekly / Monthly candles** — switch the interval to view anything from a few months to decades of price action.
-- **Support / Resistance** — swing highs/lows clustered into price levels, ranked by how often they were touched.
-- **Chart patterns** — Double Top / Double Bottom, Head & Shoulders, Inverse Head & Shoulders, and Ascending / Descending / Symmetrical Triangles (from local extrema + swing trend-lines).
-- **Candlestick patterns** — 17 classics: Doji, Hammer, Inverted Hammer, Hanging Man, Shooting Star, Bullish/Bearish Marubozu, Bullish/Bearish Engulfing, Bullish/Bearish Harami, Piercing Line, Dark Cloud Cover, Morning/Evening Star, Three White Soldiers, Three Black Crows.
-- **Minervini Trend Template** — Mark Minervini's 8-point stage-analysis screen with a pass/fail scorecard and a Weinstein-style stage (1–4).
-- **Volume signals** — volume spikes, dry-ups, volume-confirmed breakouts/breakdowns, and OBV trend.
-- **Insight engine** — a situation-aware "what to watch" panel: reads the trend/regime/momentum/levels/candles/volume together and emits prioritized, plain-English recommendations tailored to whether the stock is going up, down, or chopping. Click any recommendation or signal to **highlight the exact bars/levels it's based on** and zoom the chart there.
-- **Pattern backtester** — for THIS stock, measures how often each candlestick pattern was followed by a favorable move (5/10/20 bars) vs the unconditional baseline, so you can see which signals actually carried an edge.
-- **Forecast** — a `GradientBoostingRegressor` trained on lagged log-returns, rolled forward recursively over **business days**, with a confidence band and honest out-of-sample metrics: directional accuracy, a **majority-class baseline to compare against**, and RMSE.
-
-> On daily price data the forecast's directional accuracy typically sits near
-> the baseline (~0.5) — that's expected; daily moves are close to unpredictable.
-> The baseline column is there precisely so you can see whether the model beats
-> a coin flip. Treat it as a teaching tool, not a signal.
-
-## Project layout
-
-```
-backend/
-  app.py                 Flask API — GET /api/analyze
-  services/
-    data.py              yfinance fetch + OHLCV serialization
-    indicators.py        SMA/EMA/RSI/MACD/Bollinger
-    patterns.py          chart patterns: triangles, double tops, H&S
-    candlesticks.py      17 candlestick patterns
-    minervini.py         Minervini Trend Template scorecard
-    volume.py            volume spikes, dry-ups, breakouts, OBV
-    trends.py            multi-timeframe trend + 50/200 SMA regime
-    forecast.py          ML forecast
-    insights.py          situation-aware recommendation engine (+ chart anchors)
-    backtest.py          historical edge of each candlestick pattern
-    signal.py            composite technical-posture score + confidence interval
-    relative.py          relative strength vs SPY benchmark
-    target.py            weekly trade plan: calibrated targets + probabilities
-    volatility.py        blended OHLC/EWMA vol + per-stock tail-adaptive bands
-  tests/                 pytest suite (network-free)
-  requirements.txt
-frontend/
-  src/
-    App.jsx              layout, controls, overlay toggles
-    api.js               fetch client
-    components/
-      PriceChart.jsx     candles + all overlays
-      IndicatorPanel.jsx RSI + MACD oscillators
-      Sidebar.jsx        analytics summary
-```
-
-## Run it
-
-### 1. Backend (terminal 1)
+## Quick start
 
 ```bash
+bash start.sh        # macOS / Linux
+```
+
+This launches the Flask backend on `http://127.0.0.1:5001` and the Vite dev server on `http://localhost:5173`. First run creates a Python venv, installs `backend/requirements.txt`, and runs `npm install` for the frontend.
+
+**Manual start** (or on Windows, where `start.sh` does not run):
+
+```bash
+# backend
 cd backend
-python3 -m venv venv
-./venv/bin/pip install -r requirements.txt
-./venv/bin/python app.py          # serves http://127.0.0.1:5001
-```
+python -m venv venv
+venv/Scripts/pip install -r requirements.txt      # Windows
+venv/Scripts/python app.py                         # serves :5001
 
-### 2. Frontend (terminal 2)
-
-```bash
+# frontend (second terminal)
 cd frontend
 npm install
-npm run dev                        # serves http://localhost:5173
+npm run dev                                        # serves :5173
 ```
 
-Open **http://localhost:5173**, type a ticker (e.g. `AAPL`), and click **Analyze**.
+Open `http://localhost:5173`, type a ticker, and press Enter.
 
-Or just run `./start.sh` from the project root to launch both.
+### Optional API keys (the app works fully without them)
 
-## API
+| Variable | Enables | Without it |
+|---|---|---|
+| `FINNHUB_API_KEY` | Real next-earnings dates + the earnings run-up flag | Earnings card shows a proxy/caveat |
+| `SEC_USER_AGENT` (`"Name email@example.com"`) | Live SEC EDGAR Form 4 insider data | Insider card unavailable |
+
+Set them in your shell before `start.sh`, e.g. `export FINNHUB_API_KEY=...`.
+
+---
+
+## Features
+
+### Evidence-backed signals (the ones that count)
+
+- **Conviction Stack** *(new)* — the "best combo." Aggregates the *independent, evidence-backed* signals (momentum, insider buying, trend stage) into one read, each tagged with its evidence strength. Chart signals are shown but **weighted zero** so you can see the gap. A hot pre-earnings run-up appears as an honest **caution** that lowers conviction (the "priced-in / sell-the-news" risk — the Broadcom/Palo-Alto/Micron pattern). Combining *independent* signals is the only kind of "combo" with academic support; stacking correlated chart indicators just overfits.
+- **Relative Strength / Momentum** — the stock vs SPY over a lookback. The single best-supported price-based effect (winners tend to persist), with crash-risk caveats noted.
+- **Insider (Form 4)** — parses *actual* open-market purchases (transaction code P) vs sells and routine trades, with share counts and dollar values; flags C-suite and cluster buying. The cleanest free "smart money" signal.
+- **Dip-buy** — the one mean-reversion signal with a measured edge: buy an oversold pullback *in an uptrend*. Shows the stock's own historical bounce rate, a buy/target/stop, and refuses to fire in a downtrend (no catching falling knives).
+- **Earnings posture** — days to next earnings and a "hot run-up into earnings" caution (expectations may be priced in).
+
+### Descriptive context (useful to see, weak to bet on)
+
+- **EMA/MACD Crossover** *(new)* — your custom EMA ribbon (55/89/204) + MACD (13/34/9) with the zero-line and signal-line crosses and a combined BUY/SELL state. Clearly labeled as a **late trend-follower**: a point-in-time backtest in `backend/crossover_breakout_test.py` found it would have missed 8 of 10 of a sample portfolio's biggest surges and showed *negative* lift over the base rate for catching breakouts. Logged to the ledger so its real accuracy is measured forward.
+- **Resistance / base rates**, **Gaps**, **Extension** (stretched vs the mean), **Sector Pulse**, **Pattern Read**, **Multi-timeframe Trends**, **Candlesticks**, **Volume** — each with honest "no edge found / descriptive only" disclosures.
+
+### Risk & sizing (where a small account gains the most)
+
+- **Position Sizing** — ATR-based stop distance and fixed-fractional sizing, so each trade risks a set % of the account. Returns "unavailable" on flat/illiquid data rather than dividing by zero.
+- **Portfolio X-ray** — ETF look-through and AI/semiconductor concentration flags.
+
+### The Signal Ledger (flagship honesty feature)
+
+Every directional call (resistance breakout, dip-buy, pattern tilt, earnings run-up, EMA/MACD crossover, **and the conviction stack**) is logged on the day it fires, de-duplicated, then scored forward vs SPY at 5/21/63 days. The ledger tab shows the running calibration so you can judge each signal's *real* out-of-sample accuracy on your own tickers — the honest answer to "does this actually work?"
+
+### Charting & UX
+
+Pro candlestick chart (TradingView lightweight-charts) with a volume pane, live OHLC crosshair readout, and magnet crosshair; **drawing tools** (horizontal/trend lines, Fibonacci retracement, persisted per-ticker); split view and two-ticker compare; ⌘K command palette; quick-switch chip row; **Plain English** mode with glossary tooltips; on-demand forecast track record.
+
+---
+
+## Architecture
 
 ```
-GET /api/analyze?ticker=AAPL&period=1y&interval=1d&horizon=10
+backend/                Flask API (Python)
+  app.py                /api/analyze assembles every engine into one payload
+  services/             one engine per signal, each self-contained:
+    conviction.py         evidence-backed signal aggregator   (NEW)
+    crossover.py          EMA ribbon + MACD crossover system  (NEW)
+    relative.py           relative strength / momentum
+    insiders.py           SEC Form 4 buy/sell parser
+    dipsignal.py          oversold-in-uptrend mean reversion
+    earnings.py           next-earnings + hot run-up flag
+    ledger.py             the Signal Ledger (log + forward-score)
+    minervini.py, trends.py, resistance.py, gaps.py, extension.py,
+    sector.py, patterns.py, candlesticks.py, volume.py, indicators.py,
+    risk.py, portfolio.py, forecast.py, signal.py, quotes.py, ...
+  *_test.py             research/backtest scripts (point-in-time, no lookahead)
+  tests/                pytest suite (134 tests)
+
+frontend/               React + Vite
+  src/components/        one card per engine:
+    ConvictionCard.jsx    evidence-backed stack with strength badges (NEW)
+    CrossoverCard.jsx     EMA/MACD signal + honest caveat (NEW)
+    DipSignal.jsx, InsiderCard.jsx, Resistance.jsx, Ledger.jsx,
+    PriceChart.jsx, Sidebar.jsx, Plain.jsx, CommandPalette.jsx, ...
 ```
 
-| param    | values | default |
-|----------|--------|---------|
-| ticker   | any Yahoo symbol | — (required) |
-| period   | 1mo 3mo 6mo 1y 2y 5y 10y max | 1y |
-| interval | 1d 1wk 1mo | 1d |
-| horizon  | forecast bars (1–60) | 10 |
+**Request flow:** the frontend calls `/api/analyze?ticker=XYZ`; `app.py` fetches OHLCV, runs every engine, assembles a single JSON payload, logs any directional signals to the ledger, and returns it; `Sidebar.jsx` renders one card per engine.
 
-The response also includes a `multiTimeframe` block (`horizons`, `alignment`,
-`regime`) for the long-term trend view.
+### Data & caching
 
-## Tests
+Price data comes from Yahoo (via `yfinance`), ~15-minute delayed, with an in-process TTL cache. Several research scripts read a frozen point-in-time snapshot (`.resistance_cache.pkl`, ~80 large-caps, 10y daily) so base-rate cards are reproducible. Live quotes fall back to the cache if Yahoo throttles. `node_modules`, `venv`, `dist`, `*.pkl`, and the ledger DB are excluded from the zip — restore them with `npm install` + `pip install -r requirements.txt`.
+
+---
+
+## Testing
 
 ```bash
 cd backend
-./venv/bin/python -m pytest tests/ -q     # 121 tests, no network needed
+python -m pytest -q          # 134 tests
 ```
 
-Returns one JSON payload with `candles`, `indicators`, `trend`, `levels`,
-`patterns`, and `forecast`.
+Backtests are point-in-time (causal indicators, forward returns from the future bar) to avoid lookahead bias. Run the crossover breakout study directly:
 
-## Evidence-backed engines (what each card actually measures)
+```bash
+python crossover_breakout_test.py
+```
 
-Every analytical card is built on measured base rates, not vibes. Several
-research scripts (`*_test.py` in `backend/`) reproduce the numbers on the
-cached 80-ticker, 10-year, point-in-time universe.
+---
 
-**Single-stock analysis (`/api/analyze`)**
-- `resistance` — key 50d-high resistance, swing-touch count, breakout state, and
-  HONEST base rates: 81% of approaches break above within a month; reaching the
-  prior ATH within 63d depends on distance (88% if <2% below, 8% if >25%). Plus
-  this stock's OWN breakout track record. No measured alpha vs other stocks.
-- `patternRead` — synthesizes recent candlesticks into ONE directional tilt with
-  per-stock, direction-aware win rates (drops n<10), flags conflicts, and runs a
-  REGIME CHECK (last 2y vs full decade) to catch AI-era non-stationarity.
-- `extension` — "rubber band" vs 50d MA. Measured: extension was a momentum
-  signal (+11% fwd 63d vs +6%), NOT a top — but predicted a -17% median interim
-  drawdown. A seatbelt gauge, not an exit signal.
-- `gap` — opening-gap continuation vs fade on the stock's own history; documented
-  market-wide average leans FADE (Lou/Polk/Skouras).
-- `sectorPulse` — sector breadth + "is it me or everyone?" closest-peer
-  attribution. Measured: sector-wide selloffs price same-day (no contagion edge).
-- `earningsWatch` — Finnhub earnings date + the validated (t=-2.39) "hot run-up
-  into earnings = expectations pre-paid" flag.
-- `pros` — analyst consensus one-liner (sentiment gauge, targets skew optimistic).
-- `insider` — **SEC Form 4 cluster-buy detector** (the best evidence-backed FREE
-  signal: Lakonishok-Lee, Cohen-Malloy-Pomorski). 3+ insiders, C-suite weighted.
-  Needs `SEC_USER_AGENT` env var; degrades gracefully without SEC access.
-- `sizing` — ATR-stop position sizing for a 1%-risk bite; flags >10% positions.
-- `checklist` — composes trend / dip / sector / extension / earnings / pros / gap
-  + recent headlines into one read. No composite score (blending added no edge).
+## Honest limitations
 
-**Signal ledger (`/api/ledger`)** — the integrity capstone. Every directional
-signal the app emits is logged to SQLite and auto-scored at 5/21/63 days against
-SPY, building the app's OWN live out-of-sample track record + a calibration curve
-(did "81% break above" resolve ~81% live?). See the 📒 Signal Ledger tab.
-
-**Portfolio (`/api/portfolio`, `/api/portfolio-risk`)** — ETF look-through to TRUE
-single-name exposure, plus concentration flags (single-name >10%, AI/semi theme
->40%), weekly vol, drawdown, and fee drag. Holdings live in `holdings.json`.
-
-**Live quotes (`/api/quote/<ticker>`)** — ~15-min-delayed last price; the header
-LivePrice bar polls it every 60s so prices refresh without re-clicking Analyze.
-
-### Environment variables (all optional)
-- `FINNHUB_API_KEY` — enables the earnings-date card (free tier, 60 req/min).
-- `SEC_USER_AGENT` — `"Name email@example.com"` for the insider engine (SEC requires it).
-
-### Research scripts (reproduce the numbers; run from `backend/`)
-- `crosssection_test.py` — sector/peer/run-up hypotheses (3 of 4 failed honestly).
-- `gap_universe_test.py` — gap continuation vs fade across the universe.
-- `politician_trade_test.py` — does copying disclosed political trades beat QQQ?
-  (Harness + honest finding: the 45-day lag makes it ~index-like.)
-
-## Ideas to extend
-
-- Add a VIX-tercile regime split to ALL base-rate cards (not just patterns).
-- Fix survivorship bias: add delisted/fallen tickers to the cached universe.
-- Background scheduler (APScheduler) to pre-compute watchlist analyses + push a
-  morning briefing; convert the frontend to a PWA for installable mobile use.
-- Build the insider cluster signal into the ledger and forward-test it.
-
+- No indicator here reliably predicts breakouts or short-term moves in advance — confirmed breakouts still fail often, and "it broke resistance so it will run" is one of the least reliable rules in retail trading.
+- Even the predictive signals decay after publication (McLean-Pontiff 2016) and momentum suffers occasional violent crashes.
+- The strongest edge for a small account is **risk management and diversification**, not entry timing.
+- This is educational software, not financial advice.

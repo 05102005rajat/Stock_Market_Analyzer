@@ -123,6 +123,23 @@ def log_from_analysis(ticker: str, payload: dict) -> list[str]:
         if log(ticker, "earnings_runup", "down", price, regime=regime, note=earn.get("note")):
             logged.append("earnings_runup")
 
+    # EMA-ribbon + MACD crossover: log the combined buy/sell so its REAL
+    # out-of-sample accuracy is measured forward (the honest way to find out
+    # whether this trend-following signal works on these tickers).
+    cross = payload.get("crossover") or {}
+    if cross.get("available") and cross.get("direction") in ("up", "down"):
+        if log(ticker, "ema_macd_crossover", cross["direction"], price, regime=regime,
+               note=cross.get("label")):
+            logged.append("ema_macd_crossover")
+
+    # Conviction stack: the evidence-backed combo (momentum + insider + trend).
+    # This is the one we most want a forward scoreboard on.
+    conv = payload.get("conviction") or {}
+    if conv.get("available") and conv.get("direction") in ("up", "down"):
+        if log(ticker, "conviction_stack", conv["direction"], price, regime=regime,
+               note=conv.get("headline")):
+            logged.append("conviction_stack")
+
     return logged
 
 

@@ -1,5 +1,9 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createChart, LineStyle, ColorType } from "lightweight-charts";
+
+// Fibonacci retracement levels (drawn between two clicked points).
+const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
+const FIB_COLORS = ["#8b949e", "#26a69a", "#26a69a", "#ffb01f", "#ef5350", "#ef5350", "#8b949e"];
 
 // Renders the candlestick chart plus every overlay the user has toggled on.
 //
@@ -20,6 +24,32 @@ export default function PriceChart({ data, toggles, focus, intraday = false }) {
   // remove them on toggle without touching a disposed chart on a data change.
   const overlaysRef = useRef({ chart: null, series: [], priceLines: [] });
   const focusRef = useRef({ chart: null, priceLines: [] });
+
+  // --- Drawing tools state ---
+  // tool: null | "horizontal" | "trend" | "fib". pendingRef holds the first
+  // click of a two-click tool. drawings persist per-ticker in localStorage.
+  const [tool, setTool] = useState(null);
+  const toolRef = useRef(null);
+  const pendingRef = useRef(null);
+  const drawnRef = useRef({ chart: null, series: [], priceLines: [] });
+  const ticker = data?.ticker || "_";
+  const storeKey = `drawings:${ticker}`;
+  const [drawings, setDrawings] = useState([]);
+
+  useEffect(() => {
+    try {
+      setDrawings(JSON.parse(localStorage.getItem(`drawings:${ticker}`) || "[]"));
+    } catch {
+      setDrawings([]);
+    }
+  }, [ticker]);
+
+  useEffect(() => { toolRef.current = tool; }, [tool]);
+
+  const persist = (next) => {
+    setDrawings(next);
+    try { localStorage.setItem(storeKey, JSON.stringify(next)); } catch { /* ignore */ }
+  };
 
   // --- Effect 1: chart + candles (rebuilt only when the dataset changes) ---
   useEffect(() => {
@@ -142,8 +172,46 @@ export default function PriceChart({ data, toggles, focus, intraday = false }) {
 
     const onResize = () => chart.timeScale().fitContent();
     window.addEventListener("resize", onResize);
+
+    // --- Drawing: capture clicks, map to (time, price), build drawings ---
+    const onClick = (param) => {
+      const activeTool = toolRef.current;
+      if (!activeTool || !param.point || param.time == null) return;
+      const price = candleSeries.coordinateToPrice(param.point.y);
+      if (price == null) return;
+      const pt = { time: param.time, price: Number(price.toFixed(4)) };
+
+      if (activeTool === "horizontal") {
+        // One click = a horizontal price line.
+        const next = [...(JSON.parse(localStorage.getItem(`drawings:${data.ticker}`) || "[]")),
+                      { type: "horizontal", price: pt.price }];
+        localStorage.setItem(`drawings:${data.ticker}`, JSON.stringify(next));
+        setDrawings(next);
+        setTool(null);
+        return;
+      }
+
+      // Two-click tools (trend, fib): first click stores the anchor.
+      if (!pendingRef.current) {
+        pendingRef.current = pt;
+        return;
+      }
+      const a = pendingRef.current;
+      pendingRef.current = null;
+      const drawing =
+        activeTool === "trend"
+          ? { type: "trend", a, b: pt }
+          : { type: "fib", a, b: pt };
+      const next = [...(JSON.parse(localStorage.getItem(`drawings:${data.ticker}`) || "[]")), drawing];
+      localStorage.setItem(`drawings:${data.ticker}`, JSON.stringify(next));
+      setDrawings(next);
+      setTool(null);
+    };
+    chart.subscribeClick(onClick);
+
     return () => {
       window.removeEventListener("resize", onResize);
+      chart.unsubscribeClick(onClick);
       chart.remove();
       chartRef.current = null;
       candleRef.current = null;
@@ -284,6 +352,75 @@ export default function PriceChart({ data, toggles, focus, intraday = false }) {
     candle.setMarkers(markers);
   }, [data, toggles]);
 
+  // --- Effect 2.5: render user drawings (horizontals, trendlines, fib) ---
+  useEffect(() => {
+    const chart = chartRef.current;
+    const candle = candleRef.current;
+    if (!chart || !candle || !data) return;
+
+    // Clear previously-rendered drawings from this chart instance.
+    const prev = drawnRef.current;
+    if (prev.chart === chart) {
+      prev.series.forEach((s) => chart.removeSeries(s));
+      prev.priceLines.forEach((pl) => candle.removePriceLine(pl));
+    }
+    const added = { chart, series: [], priceLines: [] };
+    drawnRef.current = added;
+
+    const candleTimes = data.candles.map((c) => c.time);
+    const firstT = candleTimes[0];
+    const lastT = candleTimes[candleTimes.length - 1];
+
+    const lineSeries = (pts, color, width, style) => {
+      const s = chart.addLineSeries({
+        color, lineWidth: width, lineStyle: style ?? LineStyle.Solid,
+        priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
+      });
+      s.setData(pts);
+      added.series.push(s);
+      return s;
+    };
+
+    drawings.forEach((d) => {
+      if (d.type === "horizontal") {
+        added.priceLines.push(
+          candle.createPriceLine({
+            price: d.price, color: "#e0b341", lineWidth: 1,
+            lineStyle: LineStyle.Solid, axisLabelVisible: true,
+            title: `${d.price}`,
+          })
+        );
+      } else if (d.type === "trend") {
+        const [p, q] = d.a.time <= d.b.time ? [d.a, d.b] : [d.b, d.a];
+        if (p.time < q.time) {
+          lineSeries(
+            [{ time: p.time, value: p.price }, { time: q.time, value: q.price }],
+            "#4f9eff", 2, LineStyle.Solid
+          );
+        }
+      } else if (d.type === "fib") {
+        // Horizontal fib levels between the two clicked prices, spanning the
+        // time range from the earlier click to the latest bar.
+        const hi = Math.max(d.a.price, d.b.price);
+        const lo = Math.min(d.a.price, d.b.price);
+        const t0 = Math.min(d.a.time, d.b.time);
+        FIB_LEVELS.forEach((lvl, i) => {
+          const price = Number((hi - (hi - lo) * lvl).toFixed(4));
+          lineSeries(
+            [{ time: Math.max(t0, firstT), value: price }, { time: lastT, value: price }],
+            FIB_COLORS[i], 1, LineStyle.Dashed
+          );
+          added.priceLines.push(
+            candle.createPriceLine({
+              price, color: FIB_COLORS[i], lineWidth: 1, lineStyle: LineStyle.Dotted,
+              axisLabelVisible: true, title: `${(lvl * 100).toFixed(1)}%`,
+            })
+          );
+        });
+      }
+    });
+  }, [drawings, data]);
+
   // --- Effect 3: focus highlight (the "why" drill-down) ---
   // Draws bright price lines for the levels/bars a clicked signal is based on
   // and zooms the chart to that region. Kept separate from overlays/markers so
@@ -338,10 +475,33 @@ export default function PriceChart({ data, toggles, focus, intraday = false }) {
     }
   }, [focus, data]);
 
+  const undo = () => persist(drawings.slice(0, -1));
+  const clearAll = () => { persist([]); setTool(null); pendingRef.current = null; };
+  const pick = (t) => {
+    pendingRef.current = null;
+    setTool((cur) => (cur === t ? null : t));
+  };
+
   return (
     <div className="chart-wrap">
+      <div className="draw-toolbar">
+        <span className="draw-label">✏️ Draw:</span>
+        <button className={`draw-btn ${tool === "horizontal" ? "on" : ""}`} onClick={() => pick("horizontal")} title="Click once to drop a horizontal price line">─ Line</button>
+        <button className={`draw-btn ${tool === "trend" ? "on" : ""}`} onClick={() => pick("trend")} title="Click two points to draw a trendline">╱ Trend</button>
+        <button className={`draw-btn ${tool === "fib" ? "on" : ""}`} onClick={() => pick("fib")} title="Click a high then a low to draw Fibonacci levels">≡ Fib</button>
+        <span className="draw-divider" />
+        <button className="draw-btn" onClick={undo} disabled={!drawings.length} title="Undo last drawing">↶ Undo</button>
+        <button className="draw-btn" onClick={clearAll} disabled={!drawings.length} title="Remove all drawings">🗑 Clear</button>
+        {tool && (
+          <span className="draw-hint">
+            {tool === "horizontal" ? "Click the chart to place a line" :
+             tool === "trend" ? "Click two points for a trendline" :
+             "Click a high, then a low"}
+          </span>
+        )}
+      </div>
       <div className="chart-legend" ref={legendRef} />
-      <div className="chart" ref={containerRef} />
+      <div className={`chart ${tool ? "drawing" : ""}`} ref={containerRef} />
     </div>
   );
 }

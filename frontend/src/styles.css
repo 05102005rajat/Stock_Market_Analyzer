@@ -532,3 +532,46 @@ table.bt td:first-child { display: flex; align-items: center; gap: 6px; }
 .chart-legend .leg-ohlc b { color: #c9d1d9; font-weight: 600; margin-left: 1px; margin-right: 2px; }
 .chart-legend .up { color: #0bce8b; }
 .chart-legend .down { color: #f6465d; }
+
+/* Drawing toolbar */
+.draw-toolbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 6px 4px 8px; }
+.draw-label { font-size: 12px; color: #94a3b8; margin-right: 2px; }
+.draw-btn { font-size: 12px; padding: 4px 10px; border-radius: 6px;
+  border: 1px solid rgba(127,127,127,.3); background: transparent; color: inherit;
+  cursor: pointer; transition: background .12s; }
+.draw-btn:hover:not(:disabled) { background: rgba(127,127,127,.12); }
+.draw-btn.on { background: rgba(41,98,255,.22); border-color: rgba(79,158,255,.6); }
+.draw-btn:disabled { opacity: .4; cursor: default; }
+.draw-divider { width: 1px; height: 18px; background: rgba(127,127,127,.3); margin: 0 4px; }
+.draw-hint { font-size: 12px; color: #4f9eff; margin-left: 6px; }
+.chart.drawing { cursor: crosshair; }
+
+/* --- EMA + MACD crossover card --- */
+.card.crossover-buy { border-color: var(--pos); background: linear-gradient(180deg, #0d2e2a, #0e1117); }
+.card.crossover-sell { border-color: var(--neg); background: linear-gradient(180deg, #2e0d12, #0e1117); }
+.card.crossover-neutral { border-color: #3a3f4b; }
+.cross-checklist { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+.cross-cond { display: flex; align-items: baseline; gap: 8px; font-size: 13px; }
+.cross-cond .cross-mark { font-weight: 700; width: 14px; }
+.cross-cond.ok .cross-mark { color: var(--pos); }
+.cross-cond.no .cross-mark { color: var(--neg); }
+.cross-cond .cross-name { min-width: 150px; }
+.cross-events { margin: 6px 0; display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.cross-evt { white-space: nowrap; }
+.recent-line.warn { color: #f0b429; }
+
+/* --- Conviction stack card --- */
+.card.conviction-high_bull { border-color: var(--pos); background: linear-gradient(180deg, #0d2e2a, #0e1117); }
+.card.conviction-bear { border-color: var(--neg); background: linear-gradient(180deg, #2e0d12, #0e1117); }
+.card.conviction-mixed { border-color: #b8860b; }
+.conv-stack { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+.conv-row { display: grid; grid-template-columns: 18px 1fr auto; align-items: center; gap: 6px 8px; }
+.conv-row .conv-detail { grid-column: 2 / 4; margin-top: 1px; }
+.conv-mark { font-weight: 700; }
+.conv-name { font-size: 13.5px; font-weight: 600; }
+.ev-badge { font-size: 9.5px; font-weight: 800; letter-spacing: .04em; padding: 2px 6px; border-radius: 4px; }
+.ev-strong { background: #14532d; color: #86efac; }
+.ev-moderate { background: #422006; color: #fbbf24; }
+.ev-weak { background: #3a3f4b; color: #9aa0aa; }
+.conv-mark.warn { filter: grayscale(.1); }

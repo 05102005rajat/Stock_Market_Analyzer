@@ -2,10 +2,6 @@
 backend/venv/
 __pycache__/
 *.pyc
-.pytest_cache/
-
-# Caches / local artifacts
-*.pkl
 
 # Node
 frontend/node_modules/
@@ -14,6 +10,3 @@ frontend/dist/
 # Misc
 .DS_Store
 *.log
-.env
-backend/.env
-.claude/

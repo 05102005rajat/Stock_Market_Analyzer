@@ -20,6 +20,8 @@ import LivePrice from "./LivePrice";
 import ForecastRecord from "./ForecastRecord";
 import InsiderCard from "./InsiderCard";
 import SizingCard from "./SizingCard";
+import CrossoverCard from "./CrossoverCard";
+import ConvictionCard from "./ConvictionCard";
 
 export default function Sidebar({ data, focus, onFocus, plainMode = false }) {
   if (!data) return null;
@@ -53,6 +55,10 @@ export default function Sidebar({ data, focus, onFocus, plainMode = false }) {
       <PatternRead read={data.patternRead} plainMode={plainMode} />
 
       <DipSignal dip={data.dipSignal} ticker={data.ticker} plainMode={plainMode} />
+
+      <ConvictionCard conviction={data.conviction} ticker={data.ticker} plainMode={plainMode} />
+
+      <CrossoverCard crossover={data.crossover} ticker={data.ticker} plainMode={plainMode} />
 
       <Resistance res={data.resistance} onFocus={onFocus} focusKey={focusKey} plainMode={plainMode} />
 
