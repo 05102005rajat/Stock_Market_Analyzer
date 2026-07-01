@@ -1,0 +1,23 @@
+{
+  "_comment": "Updated from positions screenshot 2026-06-23 (full account). Major change: large TBIL treasury position ($2,686) + NBIS ($1,114) now dominate; added XLV, DRAM, IMAX, MU; exited QQQM/QQQ/TSM/AAPL/MSFT/CEG/DLR. Stocks ~$7,537.67. Cash carried over from prior file (not shown in screenshot — confirm). Sorted by equity.",
+  "cash": 63.36,
+  "holdings": [
+    { "ticker": "TBIL", "shares": 53.772, "avg_cost": 49.97 },
+    { "ticker": "NBIS", "shares": 4.0,    "avg_cost": 280.41 },
+    { "ticker": "NVDA", "shares": 3.92,   "avg_cost": 216.03 },
+    { "ticker": "VIG",  "shares": 2.0,    "avg_cost": 235.56 },
+    { "ticker": "VTI",  "shares": 1.0,    "avg_cost": 366.00 },
+    { "ticker": "SCHD", "shares": 11.125, "avg_cost": 32.26 },
+    { "ticker": "XLV",  "shares": 2.0,    "avg_cost": 149.64 },
+    { "ticker": "AMZN", "shares": 1.295,  "avg_cost": 243.64 },
+    { "ticker": "AVGO", "shares": 0.688,  "avg_cost": 434.79 },
+    { "ticker": "XLF",  "shares": 4.0,    "avg_cost": 53.28 },
+    { "ticker": "MNST", "shares": 2.0,    "avg_cost": 94.87 },
+    { "ticker": "XLI",  "shares": 1.009,  "avg_cost": 172.97 },
+    { "ticker": "DRAM", "shares": 2.0,    "avg_cost": 69.00 },
+    { "ticker": "IMAX", "shares": 2.0,    "avg_cost": 44.99 },
+    { "ticker": "UNH",  "shares": 0.109,  "avg_cost": 410.24 },
+    { "ticker": "MU",   "shares": 0.023,  "avg_cost": 1155.16 }
+  ],
+  "watchlist": ["SPY", "ORCL", "XLE", "VST", "JPM", "GOOGL"]
+}
