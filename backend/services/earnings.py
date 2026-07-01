@@ -67,7 +67,9 @@ def next_earnings_date(ticker: str) -> date | None:
         )
         nxt = dates[0] if dates else None
     except Exception:
-        nxt = None
+        # Transient failure (timeout, rate-limit, 5xx): don't poison the 12h
+        # cache with a false "no earnings" — just skip caching and retry later.
+        return None
     _CACHE[ticker] = (now, nxt)
     return nxt
 

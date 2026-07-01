@@ -254,10 +254,13 @@ def calibration(min_n: int = 5) -> dict:
         arr = np.array(probs)
         for lo in (0.0, 0.5, 0.6, 0.7, 0.8):
             hi = lo + (0.5 if lo == 0.0 else 0.1)
-            m = (arr[:, 0] >= lo) & (arr[:, 0] < (hi if hi < 0.9 else 1.01))
+            # The top band extends to 1.0 so p>=0.9 signals are not dropped;
+            # label it by that true upper bound (e.g. "80-100%"), not "80-90%".
+            upper = hi if hi < 0.9 else 1.01
+            m = (arr[:, 0] >= lo) & (arr[:, 0] < upper)
             if m.sum() >= min_n:
                 curve.append({
-                    "predicted_band": f"{int(lo*100)}-{int(min(hi,1)*100)}%",
+                    "predicted_band": f"{int(lo*100)}-{int(min(upper,1)*100)}%",
                     "n": int(m.sum()),
                     "realized_up_rate": round(100 * float((arr[m, 1] > 0).mean()), 0),
                 })

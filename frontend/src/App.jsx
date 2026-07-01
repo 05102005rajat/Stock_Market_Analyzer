@@ -393,7 +393,7 @@ export default function App() {
               <button className="chip" onClick={() => setFocus(null)}>Clear highlight</button>
             </div>
           )}
-          <div className="layout">
+          <div className={`layout ${splitData || compareData ? "layout-wide" : ""}`}>
             <main className="main">
               {splitData ? (
                 <div className="dual-charts">

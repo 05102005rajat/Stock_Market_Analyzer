@@ -72,7 +72,9 @@ export default function StrategyLab({ onPick }) {
               {data.strategies.map((r) => (
                 <tr key={r.name} className={r.name === "Buy & Hold" ? "bh-row" : ""}>
                   <td><b>{r.name}</b></td>
-                  <td className="num pos">+{r.total_return}%</td>
+                  <td className={`num ${r.total_return >= 0 ? "pos" : "neg"}`}>
+                    {r.total_return >= 0 ? "+" : ""}{r.total_return}%
+                  </td>
                   <td className="num neg">{r.max_drawdown}%</td>
                   <td className="num">{r.sharpe}</td>
                   <td className="num dim">{r.exposure}%</td>

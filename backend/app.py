@@ -6,6 +6,11 @@ frontend can render everything from a single request.
 """
 from __future__ import annotations
 
+from dotenv import load_dotenv
+
+# Load backend/.env (e.g. FINNHUB_API_KEY) before any service reads os.environ.
+load_dotenv()
+
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 

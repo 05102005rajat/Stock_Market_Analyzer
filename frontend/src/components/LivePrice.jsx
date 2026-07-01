@@ -8,6 +8,9 @@ export default function LivePrice({ ticker, initial }) {
 
   useEffect(() => {
     if (!ticker) return;
+    // Reset to the new ticker's analyze-time quote so we never show the prior
+    // ticker's price under the new heading while the fresh quote loads.
+    setQ(initial || null);
     let alive = true;
     const pull = async () => {
       try {

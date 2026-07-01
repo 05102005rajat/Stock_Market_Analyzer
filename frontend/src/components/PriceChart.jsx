@@ -32,21 +32,31 @@ export default function PriceChart({ data, toggles, focus, intraday = false }) {
   const toolRef = useRef(null);
   const pendingRef = useRef(null);
   const drawnRef = useRef({ chart: null, series: [], priceLines: [] });
+  const drawingsRef = useRef([]);   // live mirror of `drawings` for click handlers
   const ticker = data?.ticker || "_";
   const storeKey = `drawings:${ticker}`;
   const [drawings, setDrawings] = useState([]);
 
   useEffect(() => {
-    try {
-      setDrawings(JSON.parse(localStorage.getItem(`drawings:${ticker}`) || "[]"));
-    } catch {
-      setDrawings([]);
-    }
+    let loaded = [];
+    try { loaded = JSON.parse(localStorage.getItem(`drawings:${ticker}`) || "[]"); } catch { loaded = []; }
+    drawingsRef.current = loaded;
+    setDrawings(loaded);
   }, [ticker]);
 
   useEffect(() => { toolRef.current = tool; }, [tool]);
 
+  // Esc cancels an in-progress drawing and puts the tool away so you can pan/zoom.
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") { pendingRef.current = null; setTool(null); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const persist = (next) => {
+    drawingsRef.current = next;
     setDrawings(next);
     try { localStorage.setItem(storeKey, JSON.stringify(next)); } catch { /* ignore */ }
   };
@@ -174,6 +184,15 @@ export default function PriceChart({ data, toggles, focus, intraday = false }) {
     window.addEventListener("resize", onResize);
 
     // --- Drawing: capture clicks, map to (time, price), build drawings ---
+    // Append a finished drawing and keep the tool active (sticky) so you can
+    // place several in a row without re-picking the tool each time. Esc finishes.
+    const commit = (drawing) => {
+      const next = [...drawingsRef.current, drawing];
+      drawingsRef.current = next;
+      setDrawings(next);
+      try { localStorage.setItem(`drawings:${data.ticker}`, JSON.stringify(next)); } catch { /* ignore */ }
+    };
+
     const onClick = (param) => {
       const activeTool = toolRef.current;
       if (!activeTool || !param.point || param.time == null) return;
@@ -182,15 +201,9 @@ export default function PriceChart({ data, toggles, focus, intraday = false }) {
       const pt = { time: param.time, price: Number(price.toFixed(4)) };
 
       if (activeTool === "horizontal") {
-        // One click = a horizontal price line.
-        const next = [...(JSON.parse(localStorage.getItem(`drawings:${data.ticker}`) || "[]")),
-                      { type: "horizontal", price: pt.price }];
-        localStorage.setItem(`drawings:${data.ticker}`, JSON.stringify(next));
-        setDrawings(next);
-        setTool(null);
+        commit({ type: "horizontal", price: pt.price });   // one click; tool stays active
         return;
       }
-
       // Two-click tools (trend, fib): first click stores the anchor.
       if (!pendingRef.current) {
         pendingRef.current = pt;
@@ -198,14 +211,7 @@ export default function PriceChart({ data, toggles, focus, intraday = false }) {
       }
       const a = pendingRef.current;
       pendingRef.current = null;
-      const drawing =
-        activeTool === "trend"
-          ? { type: "trend", a, b: pt }
-          : { type: "fib", a, b: pt };
-      const next = [...(JSON.parse(localStorage.getItem(`drawings:${data.ticker}`) || "[]")), drawing];
-      localStorage.setItem(`drawings:${data.ticker}`, JSON.stringify(next));
-      setDrawings(next);
-      setTool(null);
+      commit(activeTool === "trend" ? { type: "trend", a, b: pt } : { type: "fib", a, b: pt });
     };
     chart.subscribeClick(onClick);
 
@@ -382,44 +388,136 @@ export default function PriceChart({ data, toggles, focus, intraday = false }) {
     };
 
     drawings.forEach((d) => {
-      if (d.type === "horizontal") {
-        added.priceLines.push(
-          candle.createPriceLine({
-            price: d.price, color: "#e0b341", lineWidth: 1,
-            lineStyle: LineStyle.Solid, axisLabelVisible: true,
-            title: `${d.price}`,
-          })
-        );
-      } else if (d.type === "trend") {
-        const [p, q] = d.a.time <= d.b.time ? [d.a, d.b] : [d.b, d.a];
-        if (p.time < q.time) {
-          lineSeries(
-            [{ time: p.time, value: p.price }, { time: q.time, value: q.price }],
-            "#4f9eff", 2, LineStyle.Solid
-          );
-        }
-      } else if (d.type === "fib") {
-        // Horizontal fib levels between the two clicked prices, spanning the
-        // time range from the earlier click to the latest bar.
-        const hi = Math.max(d.a.price, d.b.price);
-        const lo = Math.min(d.a.price, d.b.price);
-        const t0 = Math.min(d.a.time, d.b.time);
-        FIB_LEVELS.forEach((lvl, i) => {
-          const price = Number((hi - (hi - lo) * lvl).toFixed(4));
-          lineSeries(
-            [{ time: Math.max(t0, firstT), value: price }, { time: lastT, value: price }],
-            FIB_COLORS[i], 1, LineStyle.Dashed
-          );
+      // A malformed drawing must never blank the whole chart — isolate each.
+      try {
+        if (d.type === "horizontal") {
           added.priceLines.push(
             candle.createPriceLine({
-              price, color: FIB_COLORS[i], lineWidth: 1, lineStyle: LineStyle.Dotted,
-              axisLabelVisible: true, title: `${(lvl * 100).toFixed(1)}%`,
+              price: d.price, color: "#e0b341", lineWidth: 1,
+              lineStyle: LineStyle.Solid, axisLabelVisible: true,
+              title: `${d.price}`,
             })
           );
-        });
-      }
+        } else if (d.type === "trend") {
+          const [p, q] = d.a.time <= d.b.time ? [d.a, d.b] : [d.b, d.a];
+          if (p.time < q.time) {
+            lineSeries(
+              [{ time: p.time, value: p.price }, { time: q.time, value: q.price }],
+              "#4f9eff", 2, LineStyle.Solid
+            );
+          }
+        } else if (d.type === "fib") {
+          // Horizontal fib levels between the two clicked prices, spanning the
+          // time range from the earlier click to the latest bar.
+          const hi = Math.max(d.a.price, d.b.price);
+          const lo = Math.min(d.a.price, d.b.price);
+          const t0 = Math.min(d.a.time, d.b.time);
+          FIB_LEVELS.forEach((lvl, i) => {
+            const price = Number((hi - (hi - lo) * lvl).toFixed(4));
+            lineSeries(
+              [{ time: Math.max(t0, firstT), value: price }, { time: lastT, value: price }],
+              FIB_COLORS[i], 1, LineStyle.Dashed
+            );
+            added.priceLines.push(
+              candle.createPriceLine({
+                price, color: FIB_COLORS[i], lineWidth: 1, lineStyle: LineStyle.Dotted,
+                axisLabelVisible: true, title: `${(lvl * 100).toFixed(1)}%`,
+              })
+            );
+          });
+        }
+      } catch { /* skip this drawing, keep the rest of the chart alive */ }
     });
   }, [drawings, data]);
+
+  // --- Effect 2.7: live rubber-band preview while a tool is active ---
+  // ONE reusable series + ONE reusable price line, updated as the cursor moves.
+  // CRITICAL: the crosshair handler only records the desired state; the actual
+  // series mutation is flushed on the next animation frame. Calling setData
+  // synchronously inside subscribeCrosshairMove re-enters the chart's own redraw
+  // and crashes it (blank screen) — rAF decouples it and also throttles to 60fps.
+  useEffect(() => {
+    const chart = chartRef.current;
+    const candle = candleRef.current;
+    if (!chart || !candle || !data || !tool) return;
+
+    const pv = chart.addLineSeries({
+      color: tool === "fib" ? "#9aa4b2" : "#4f9eff",
+      lineWidth: 1, lineStyle: LineStyle.Dashed,
+      priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
+      autoscaleInfoProvider: () => null,   // preview must never rescale the price axis
+    });
+    pv.setData([]);
+    let pvLine = null;
+    let raf = 0;
+    let pending = null;   // latest desired preview, applied on the next frame
+    const dropLine = () => { if (pvLine) { try { candle.removePriceLine(pvLine); } catch { /* gone */ } pvLine = null; } };
+
+    const candleTimes = data.candles.map((c) => c.time);
+    const firstT = candleTimes[0];
+    const lastT = candleTimes[candleTimes.length - 1];
+
+    const flush = () => {
+      raf = 0;
+      const p = pending;
+      try {
+        if (!p) { pv.setData([]); dropLine(); return; }
+        if (p.kind === "h") {
+          if (!pvLine) pvLine = candle.createPriceLine({
+            price: p.price, color: "#e0b341", lineWidth: 1, lineStyle: LineStyle.Dashed,
+            axisLabelVisible: true, title: "",
+          });
+          else pvLine.applyOptions({ price: p.price });
+        } else {
+          pv.setData(p.pts);
+        }
+      } catch { /* transient chart state during rebuild — ignore */ }
+    };
+    const schedule = (next) => { pending = next; if (!raf) raf = requestAnimationFrame(flush); };
+
+    const onMove = (param) => {
+      // Only bail when the cursor leaves the chart entirely. In the blank area
+      // to the right/left of the candles param.time is undefined but param.point
+      // still exists — we clamp the time below instead of clearing the preview.
+      if (!param.point) { schedule(null); return; }
+      const price = candle.coordinateToPrice(param.point.y);
+      if (price == null) return;
+      const py = Number(price.toFixed(4));
+
+      if (tool === "horizontal") { schedule({ kind: "h", price: py }); return; }
+
+      const a = pendingRef.current;          // no anchor yet → nothing to preview
+      if (!a) { schedule({ kind: "l", pts: [] }); return; }
+
+      // Resolve the cursor's time. Over the right/left whitespace param.time is
+      // undefined, so clamp to the last/first bar so the line tracks the cursor's
+      // height at the chart edge rather than vanishing.
+      let t = param.time;
+      if (t == null) {
+        const lastX = chart.timeScale().timeToCoordinate(lastT);
+        t = (lastX != null && param.point.x >= lastX) ? lastT : firstT;
+      }
+      if (t === a.time) { schedule({ kind: "l", pts: [] }); return; }
+
+      if (tool === "fib") {
+        const lo = Math.min(a.time, t), hi = Math.max(a.time, t);
+        schedule({ kind: "l", pts: [{ time: lo, value: py }, { time: hi, value: py }] });
+        return;
+      }
+      // trend: rubber-band line from the anchor to the cursor (times ascending).
+      schedule({ kind: "l", pts: a.time < t
+        ? [{ time: a.time, value: a.price }, { time: t, value: py }]
+        : [{ time: t, value: py }, { time: a.time, value: a.price }] });
+    };
+
+    chart.subscribeCrosshairMove(onMove);
+    return () => {
+      chart.unsubscribeCrosshairMove(onMove);
+      if (raf) cancelAnimationFrame(raf);
+      try { chart.removeSeries(pv); } catch { /* chart already disposed */ }
+      dropLine();
+    };
+  }, [tool, data]);
 
   // --- Effect 3: focus highlight (the "why" drill-down) ---
   // Draws bright price lines for the levels/bars a clicked signal is based on
@@ -494,14 +592,16 @@ export default function PriceChart({ data, toggles, focus, intraday = false }) {
         <button className="draw-btn" onClick={clearAll} disabled={!drawings.length} title="Remove all drawings">🗑 Clear</button>
         {tool && (
           <span className="draw-hint">
-            {tool === "horizontal" ? "Click the chart to place a line" :
-             tool === "trend" ? "Click two points for a trendline" :
-             "Click a high, then a low"}
+            {tool === "horizontal" ? "Click to drop lines — keep going · Esc to finish" :
+             tool === "trend" ? "Click two points per line · Esc to finish" :
+             "Click a high, then a low · Esc to finish"}
           </span>
         )}
       </div>
-      <div className="chart-legend" ref={legendRef} />
-      <div className={`chart ${tool ? "drawing" : ""}`} ref={containerRef} />
+      <div className="chart-area">
+        <div className="chart-legend" ref={legendRef} />
+        <div className={`chart ${tool ? "drawing" : ""}`} ref={containerRef} />
+      </div>
     </div>
   );
 }

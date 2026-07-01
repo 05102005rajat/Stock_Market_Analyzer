@@ -77,14 +77,19 @@ def track_record(df: pd.DataFrame, horizon: int = 10, n_tests: int = 40) -> dict
         n_estimators=80, max_depth=3, learning_rate=0.06, subsample=0.8, random_state=42)
 
     refit_every = 8
+    fitted = False
     for j, t in enumerate(range(start, n - horizon)):
         Xtr = feat_all.iloc[:t].dropna()
         ytr = target_all.loc[Xtr.index].dropna()
         Xtr = Xtr.loc[ytr.index]
         if len(Xtr) < 100:
             continue
-        if j % refit_every == 0:
+        # Refit on schedule, but also on the first usable window — otherwise an
+        # early `continue` (above) could leave the model unfitted when j skips
+        # past a multiple of refit_every, crashing model.predict below.
+        if not fitted or j % refit_every == 0:
             model.fit(Xtr.to_numpy(), ytr.to_numpy())
+            fitted = True
 
         # One-shot horizon estimate: project the average predicted daily drift.
         # (Much faster than full recursive roll, and direction is what we score.)
