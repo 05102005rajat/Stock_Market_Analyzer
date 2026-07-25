@@ -58,6 +58,33 @@ def health():
     return jsonify({"status": "ok"})
 
 
+def _validate_holdings(holdings) -> str | None:
+    """Return an error message if `holdings` isn't a well-formed list of
+    {ticker, shares[, avg_cost]} dicts, else None."""
+    if not isinstance(holdings, list):
+        return "'holdings' must be a list"
+    for h in holdings:
+        if not isinstance(h, dict):
+            return "each holding must be an object with 'ticker' and 'shares'"
+        ticker = h.get("ticker")
+        if not ticker or not isinstance(ticker, str):
+            return "each holding must include a non-empty 'ticker'"
+        shares = h.get("shares")
+        if shares is None:
+            return f"holding '{ticker}' is missing 'shares'"
+        try:
+            float(shares)
+        except (TypeError, ValueError):
+            return f"holding '{ticker}' has an invalid 'shares' value"
+        avg_cost = h.get("avg_cost")
+        if avg_cost is not None:
+            try:
+                float(avg_cost)
+            except (TypeError, ValueError):
+                return f"holding '{ticker}' has an invalid 'avg_cost' value"
+    return None
+
+
 @app.route("/api/portfolio", methods=["GET", "POST"])
 def portfolio_view():
     analyze = request.args.get("analyze", "1") != "0"
@@ -66,6 +93,10 @@ def portfolio_view():
         body = request.get_json(silent=True) or {}
         holdings = body.get("holdings")  # [{ticker, shares, avg_cost}, ...]
         cash = body.get("cash")
+        if holdings is not None:
+            err = _validate_holdings(holdings)
+            if err:
+                return jsonify({"error": err}), 400
     try:
         return jsonify(portfolio_svc.analyze_portfolio(holdings=holdings, cash=cash, analyze=analyze))
     except Exception as e:
