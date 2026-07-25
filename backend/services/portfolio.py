@@ -254,8 +254,17 @@ def look_through(rows: list[dict], cash: float = 0.0) -> dict:
             sources.setdefault(t, set()).add(t)
             sector_exp[_stock_sector(t)] = sector_exp.get(_stock_sector(t), 0) + v
 
-    weights = np.array(list(exposure.values())) / total
-    hhi = float(np.sum(weights ** 2))
+    # HHI needs weights that sum to 1 to mean anything. `total` includes cash
+    # and the unresolved ETF residual, which aren't identified single-name bets —
+    # dividing by it here would silently shrink the weights (and explode
+    # effective_n) whenever cash/residual is a big share of the account.
+    # Normalize over the resolved exposure itself instead.
+    resolved_total = sum(exposure.values())
+    if resolved_total > 0:
+        weights = np.array(list(exposure.values())) / resolved_total
+        hhi = float(np.sum(weights ** 2))
+    else:
+        hhi = None
     eff = sorted(exposure.items(), key=lambda kv: -kv[1])
     mega_pct = sum(val for u, val in exposure.items() if u in MEGACAP8) / total * 100
     top3 = sum(val for _, val in eff[:3]) / total * 100
@@ -289,8 +298,8 @@ def look_through(rows: list[dict], cash: float = 0.0) -> dict:
         "flags": flags,
         "residual_diversified_pct": round(residual / total * 100, 1),
         "concentration": {
-            "hhi": round(hhi, 3),
-            "effective_n": round(1 / hhi, 1) if hhi > 0 else None,
+            "hhi": round(hhi, 3) if hhi is not None else None,
+            "effective_n": round(1 / hhi, 1) if hhi else None,
             "top3_pct": round(top3, 1),
             "megacap8_pct": round(mega_pct, 1),
         },
@@ -459,6 +468,10 @@ def analyze_portfolio(holdings: list[dict] | None = None, cash: float | None = N
             "total_gain": round(invested - invested_cost, 2),
             "total_gain_pct": round((invested / invested_cost - 1) * 100, 2) if invested_cost else None,
             "positions": len([r for r in rows if r.get("value")]),
+            # Holdings whose price fetch failed are silently excluded from every
+            # total above (value, invested, positions) — surface which ones so
+            # the UI can warn instead of just making the position disappear.
+            "failed_tickers": [r["ticker"] for r in rows if r.get("error")],
         },
         "look_through": lt,
         "risk": portfolio_weekly_vol(rows),

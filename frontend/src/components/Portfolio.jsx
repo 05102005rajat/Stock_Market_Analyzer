@@ -193,6 +193,13 @@ export default function Portfolio({ data, loading, error, onPick, onSave, onRelo
     <div className="portfolio">
       <HealthCheck holdings={holdings} />
 
+      {summary.failed_tickers?.length > 0 && (
+        <p className="error small">
+          ⚠ Couldn't fetch data for <b>{summary.failed_tickers.join(", ")}</b> — excluded from every total and
+          view below (check the ticker is correct, or the market may be closed for it).
+        </p>
+      )}
+
       {/* Top summary bar */}
       <section className="card pf-top">
         <div>
