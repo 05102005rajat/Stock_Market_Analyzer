@@ -57,3 +57,42 @@ def test_concentration_metrics(monkeypatch):
 
 def test_empty_portfolio_unavailable():
     assert portfolio.look_through([])["available"] is False
+
+
+def test_concentration_ignores_cash_and_residual_in_denominator(monkeypatch):
+    # A cash-heavy account with one small stock position must NOT explode
+    # effective_n — HHI should be computed over the resolved single-name
+    # exposure only, not diluted by cash/residual sitting in `total`.
+    monkeypatch.setattr(portfolio, "_fund_holdings", lambda t: None)
+    monkeypatch.setattr(portfolio, "_stock_sector", lambda t: "Technology")
+    rows = [{"ticker": "AAPL", "value": 180.0}]
+    c = portfolio.look_through(rows, cash=100000.0)["concentration"]
+    assert abs(c["hhi"] - 1.0) < 1e-9        # one identified bet -> maximally concentrated
+    assert abs(c["effective_n"] - 1.0) < 1e-9
+
+
+def test_concentration_none_when_nothing_resolved():
+    # All-cash account (or nothing identifiable): no division by zero, no crash.
+    lt = portfolio.look_through([], cash=500.0)
+    assert lt["concentration"]["hhi"] is None
+    assert lt["concentration"]["effective_n"] is None
+
+
+def test_failed_ticker_row_is_identifiable_via_error(monkeypatch):
+    # A holding whose price fetch fails must still carry an 'error' flag so
+    # callers (analyze_portfolio's failed_tickers) can warn instead of just
+    # silently dropping it from every total.
+    def fake_fetch(ticker, **kw):
+        if ticker == "BADTICKER":
+            raise RuntimeError("no data")
+        return pd.DataFrame({"close": _series(np.linspace(100, 110, 60))})
+    monkeypatch.setattr(portfolio.data, "fetch_ohlcv", fake_fetch)
+    monkeypatch.setattr(portfolio, "_fund_holdings", lambda t: None)
+    rows = portfolio.value_holdings(
+        [{"ticker": "AAPL", "shares": 1, "avg_cost": 100}, {"ticker": "BADTICKER", "shares": 5, "avg_cost": 100}],
+        analyze=False,
+    )
+    failed = [r["ticker"] for r in rows if r.get("error")]
+    assert failed == ["BADTICKER"]
+    bad = next(r for r in rows if r["ticker"] == "BADTICKER")
+    assert "value" not in bad

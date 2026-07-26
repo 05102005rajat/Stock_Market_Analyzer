@@ -14,8 +14,8 @@ export default function ExposureXray({ lt }) {
       <p className="situation">
         After unpacking your ETFs, <b>{c.top3_pct}% of your money is really in just 3 companies</b>
         {stacked.length > 0 && (
-          <> — and you own <b>{stacked.slice(0, 3).map((e) => e.ticker).join(", ")}</b> in {stacked[0].places} places
-          each (directly <i>and</i> inside your funds, so the real bet is bigger than it looks).</>
+          <> — and you own <b>{stacked.slice(0, 3).map((e) => `${e.ticker} (${e.places}x)`).join(", ")}</b>{" "}
+          in multiple places (directly <i>and</i> inside your funds, so the real bet is bigger than it looks).</>
         )}
       </p>
 
