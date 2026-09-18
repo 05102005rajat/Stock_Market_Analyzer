@@ -6,6 +6,18 @@ A personal stock-analysis web app that does something most stock tools refuse to
 
 ---
 
+## Key results
+
+- **134/134 backend tests passing** (`pytest`), covering 33 self-contained signal-engine modules under `backend/services/`.
+- **33 standalone backtest/research scripts** (`backend/*_test.py`) — point-in-time and causal (no lookahead bias) — are what actually back every row of the evidence-hierarchy table below, not just asserted claims.
+- **Portfolio concentration is quantified, not eyeballed**: Herfindahl-Hirschman Index (HHI) and effective-N computed after ETF look-through, plus cross-holding detection that flags a ticker held both directly *and* inside a fund (e.g., NVDA held outright and inside QQQ).
+- **Forecast module** is a walk-forward-validated `scikit-learn` `GradientBoostingRegressor` on lagged log-return/technical features, run recursively for multi-step projection with a per-stock, volatility-scaled adaptive confidence band — and it self-reports its own rolling directional hit-rate instead of just claiming accuracy.
+- **~5,700 lines of Python** across the Flask API and its 33 service modules, **~4,000 lines of React/JavaScript** across 38 components — full source, no hosted demo required to read the logic.
+
+**Stack:** React 18 + Vite (frontend) · Flask (Python REST API) · `yfinance` (OHLCV, fundamentals, insider filings, news) · TradingView `lightweight-charts` (candlesticks) · `pandas` / `numpy` / `scipy` (signal math, `scipy.signal.argrelextrema` for pattern detection) · `scikit-learn` (forecast model) · SQLite (Signal Ledger).
+
+---
+
 ## The one idea behind the whole app
 
 Most charting tools present every indicator with equal confidence — a MACD cross looks as authoritative as an insider buying $2M of stock. The research says they are nowhere near equal. So this app sorts everything into two buckets and never lets you forget which is which:
@@ -85,12 +97,16 @@ Set them in your shell before `start.sh`, e.g. `export FINNHUB_API_KEY=...`.
 ### Descriptive context (useful to see, weak to bet on)
 
 - **EMA/MACD Crossover** *(new)* — your custom EMA ribbon (55/89/204) + MACD (13/34/9) with the zero-line and signal-line crosses and a combined BUY/SELL state. Clearly labeled as a **late trend-follower**: a point-in-time backtest in `backend/crossover_breakout_test.py` found it would have missed 8 of 10 of a sample portfolio's biggest surges and showed *negative* lift over the base rate for catching breakouts. Logged to the ledger so its real accuracy is measured forward.
-- **Resistance / base rates**, **Gaps**, **Extension** (stretched vs the mean), **Sector Pulse**, **Pattern Read**, **Multi-timeframe Trends**, **Candlesticks**, **Volume** — each with honest "no edge found / descriptive only" disclosures.
+- **Resistance / base rates**, **Gaps**, **Extension** (stretched vs the mean), **Sector Pulse**, **Pattern Read**, **Multi-timeframe Trends**, **Candlesticks**, **Volume**, **Analyst Consensus** (sell-side rating/target, framed as sentiment not expected return), **Recent News** (catalyst attribution, not a prediction) — each with honest "no edge found / descriptive only" disclosures.
+
+### Short-horizon forecast (statistical model, honestly self-scored)
+
+- **Price forecast** — a `scikit-learn` `GradientBoostingRegressor` trained on 10 lags of log-returns plus rolling-mean/momentum features, predicting next-day return and rolling that prediction forward recursively to project `horizon` days out. The confidence band is adaptive per stock (the trailing 95th-percentile of standardized moves, floored/capped for stability) instead of one fixed width for every ticker. Rather than assert accuracy, it exposes its own **walk-forward track record**: a rolling scorecard of directional hit-rate, broken out for up-calls vs down-calls separately so a bull run can't inflate the score.
 
 ### Risk & sizing (where a small account gains the most)
 
 - **Position Sizing** — ATR-based stop distance and fixed-fractional sizing, so each trade risks a set % of the account. Returns "unavailable" on flat/illiquid data rather than dividing by zero.
-- **Portfolio X-ray** — ETF look-through and AI/semiconductor concentration flags.
+- **Portfolio X-ray** — values each holding and resolves ETFs into their underlying constituents (look-through) to get TRUE single-name exposure, flagging **cross-holding** where a name is owned directly *and* through a fund. Concentration is quantified with the **Herfindahl-Hirschman Index (HHI)** and **effective-N**, alongside single-name (>10%) and sector/theme (AI-semiconductor basket, mega-cap tech, >40%) caps. Also computes blended fund-fee drag (10y/30y, vs. a hypothetical 1%-fee fund) and historical portfolio max-drawdown/recovery time from value-weighted daily returns.
 
 ### The Signal Ledger (flagship honesty feature)
 
@@ -98,7 +114,7 @@ Every directional call (resistance breakout, dip-buy, pattern tilt, earnings run
 
 ### Charting & UX
 
-Pro candlestick chart (TradingView lightweight-charts) with a volume pane, live OHLC crosshair readout, and magnet crosshair; **drawing tools** (horizontal/trend lines, Fibonacci retracement, persisted per-ticker); split view and two-ticker compare; ⌘K command palette; quick-switch chip row; **Plain English** mode with glossary tooltips; on-demand forecast track record.
+Pro candlestick chart (TradingView lightweight-charts) with a volume pane, live OHLC crosshair readout, and magnet crosshair; **drawing tools** (horizontal/trend lines, Fibonacci retracement, persisted per-ticker); split view and two-ticker compare; ⌘K command palette; quick-switch chip row; **Plain English** mode with glossary tooltips.
 
 ---
 
@@ -117,9 +133,10 @@ backend/                Flask API (Python)
     ledger.py             the Signal Ledger (log + forward-score)
     minervini.py, trends.py, resistance.py, gaps.py, extension.py,
     sector.py, patterns.py, candlesticks.py, volume.py, indicators.py,
-    risk.py, portfolio.py, forecast.py, signal.py, quotes.py, ...
-  *_test.py             research/backtest scripts (point-in-time, no lookahead)
-  tests/                pytest suite (134 tests)
+    risk.py, portfolio.py, forecast.py, signal.py, quotes.py,
+    analysts.py, news.py, backtest.py, scanner.py, strategies.py, ...
+  *_test.py             33 research/backtest scripts (point-in-time, no lookahead)
+  tests/                pytest suite (134 tests, 23 test files)
 
 frontend/               React + Vite
   src/components/        one card per engine:
@@ -133,7 +150,7 @@ frontend/               React + Vite
 
 ### Data & caching
 
-Price data comes from Yahoo (via `yfinance`), ~15-minute delayed, with an in-process TTL cache. Several research scripts read a frozen point-in-time snapshot (`.resistance_cache.pkl`, ~80 large-caps, 10y daily) so base-rate cards are reproducible. Live quotes fall back to the cache if Yahoo throttles. `node_modules`, `venv`, `dist`, `*.pkl`, and the ledger DB are excluded from the zip — restore them with `npm install` + `pip install -r requirements.txt`.
+Price data comes from Yahoo (via `yfinance`), ~15-minute delayed, with an in-process TTL cache (5 minutes for OHLCV history, 30 seconds for live quotes). Several research scripts read a frozen point-in-time snapshot (`.resistance_cache.pkl`, ~80 large-caps, 10y daily) so base-rate cards are reproducible; that cache is generated locally by the scripts and isn't committed. Live quotes fall back to the cache if Yahoo throttles. `node_modules`, `venv`, and `dist` are excluded via `.gitignore` — restore them with `npm install` + `pip install -r requirements.txt`; `backend/signal_ledger.db` (SQLite) is committed so the Signal Ledger's history ships with the repo.
 
 ---
 
