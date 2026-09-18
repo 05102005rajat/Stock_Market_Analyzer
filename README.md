@@ -8,8 +8,8 @@ A personal stock-analysis web app that does something most stock tools refuse to
 
 ## Key results
 
-- **134/134 backend tests passing** (`pytest`), covering 33 self-contained signal-engine modules under `backend/services/`.
-- **33 standalone backtest/research scripts** (`backend/*_test.py`) — point-in-time and causal (no lookahead bias) — are what actually back every row of the evidence-hierarchy table below, not just asserted claims.
+- **137/137 backend tests passing** (`pytest`, 23 test files), covering 33 self-contained signal-engine modules under `backend/services/`.
+- **33 standalone backtest/research scripts** (`backend/*_test.py`, `*_backtest.py`, `*_study.py`, `walkforward.py`, …) — point-in-time and causal (no lookahead bias) — are what actually back every row of the evidence-hierarchy table below, not just asserted claims.
 - **Portfolio concentration is quantified, not eyeballed**: Herfindahl-Hirschman Index (HHI) and effective-N computed after ETF look-through, plus cross-holding detection that flags a ticker held both directly *and* inside a fund (e.g., NVDA held outright and inside QQQ).
 - **Forecast module** is a walk-forward-validated `scikit-learn` `GradientBoostingRegressor` on lagged log-return/technical features, run recursively for multi-step projection with a per-stock, volatility-scaled adaptive confidence band — and it self-reports its own rolling directional hit-rate instead of just claiming accuracy.
 - **~5,700 lines of Python** across the Flask API and its 33 service modules, **~4,000 lines of React/JavaScript** across 38 components — full source, no hosted demo required to read the logic.
@@ -135,8 +135,9 @@ backend/                Flask API (Python)
     sector.py, patterns.py, candlesticks.py, volume.py, indicators.py,
     risk.py, portfolio.py, forecast.py, signal.py, quotes.py,
     analysts.py, news.py, backtest.py, scanner.py, strategies.py, ...
-  *_test.py             33 research/backtest scripts (point-in-time, no lookahead)
-  tests/                pytest suite (134 tests, 23 test files)
+  *_test.py, *_backtest.py, *_study.py, walkforward.py, ...
+                        33 research/backtest scripts (point-in-time, no lookahead)
+  tests/                pytest suite (137 tests, 23 test files)
 
 frontend/               React + Vite
   src/components/        one card per engine:
