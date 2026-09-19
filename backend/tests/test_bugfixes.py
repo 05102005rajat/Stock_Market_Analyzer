@@ -44,3 +44,26 @@ def test_future_dates_no_off_by_one_for_nonbusiness_last():
     fd = forecast._future_dates(idx, 3, "1d")
     assert fd[0] == pd.Timestamp("2023-06-19")  # Monday, not skipped
     assert len(fd) == 3 and all(d.weekday() < 5 for d in fd)
+
+
+def _post(client, body):
+    return client.post("/api/portfolio?analyze=0", json=body)
+
+
+def test_validator_coerces_numeric_strings():
+    # JSON may legitimately carry "10" rather than 10. Testing float() without
+    # keeping the result let the string reach `shares * price` and 500.
+    import app as flask_app
+    c = flask_app.app.test_client()
+    r = _post(c, {"holdings": [{"ticker": "AAPL", "shares": "10", "avg_cost": "180"}]})
+    assert r.status_code == 200
+
+
+def test_validator_rejects_non_finite_and_negative_shares():
+    import app as flask_app
+    c = flask_app.app.test_client()
+    for bad in (float("nan"), float("inf")):
+        r = _post(c, {"holdings": [{"ticker": "AAPL", "shares": bad}]})
+        assert r.status_code == 400 and "non-finite" in r.get_json()["error"]
+    r = _post(c, {"holdings": [{"ticker": "AAPL", "shares": -5}]})
+    assert r.status_code == 400 and "negative" in r.get_json()["error"]

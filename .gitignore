@@ -16,4 +16,4 @@ frontend/dist/
 *.log
 .env
 backend/.env
-.claude/
+.claude/settings.local.json

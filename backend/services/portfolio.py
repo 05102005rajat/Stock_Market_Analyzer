@@ -254,14 +254,19 @@ def look_through(rows: list[dict], cash: float = 0.0) -> dict:
             sources.setdefault(t, set()).add(t)
             sector_exp[_stock_sector(t)] = sector_exp.get(_stock_sector(t), 0) + v
 
-    # HHI needs weights that sum to 1 to mean anything. `total` includes cash
-    # and the unresolved ETF residual, which aren't identified single-name bets —
-    # dividing by it here would silently shrink the weights (and explode
-    # effective_n) whenever cash/residual is a big share of the account.
-    # Normalize over the resolved exposure itself instead.
-    resolved_total = sum(exposure.values())
-    if resolved_total > 0:
-        weights = np.array(list(exposure.values())) / resolved_total
+    # HHI needs weights that sum to 1 to mean anything. Cash is not an equity
+    # bet, so it stays out of the denominator — dividing by it would shrink
+    # every weight and explode effective_n for a cash-heavy account.
+    #
+    # The ETF residual is different: it IS invested, spread thinly across the
+    # constituents a fund doesn't report (for VOO, ~490 names below the top 10).
+    # Leaving it out was overstating concentration badly — a 100%-VOO account
+    # read as effective_n 6.9. It belongs in the denominator, contributing
+    # essentially nothing to the sum of squares, which is what "many tiny
+    # positions" should do.
+    invested_total = sum(exposure.values()) + residual
+    if invested_total > 0 and exposure:
+        weights = np.array(list(exposure.values())) / invested_total
         hhi = float(np.sum(weights ** 2))
     else:
         hhi = None

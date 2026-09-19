@@ -96,3 +96,41 @@ def test_failed_ticker_row_is_identifiable_via_error(monkeypatch):
     assert failed == ["BADTICKER"]
     bad = next(r for r in rows if r["ticker"] == "BADTICKER")
     assert "value" not in bad
+
+
+def test_hhi_counts_etf_residual_as_diversified(monkeypatch):
+    # A fund reporting only its top holdings leaves a residual that IS invested,
+    # spread across the names it doesn't list. Excluding it from the denominator
+    # made a pure index-fund account read as ~7 effective bets.
+    monkeypatch.setattr(
+        portfolio, "_fund_holdings",
+        lambda t: {"AAPL": 0.07, "MSFT": 0.06, "NVDA": 0.06} if t == "VOO" else None,
+    )
+    monkeypatch.setattr(portfolio, "_fund_sectors", lambda t: None)
+    monkeypatch.setattr(portfolio, "_stock_sector", lambda t: "Tech")
+    lt = portfolio.look_through([{"ticker": "VOO", "value": 1000.0}], cash=0.0)
+    # 19% resolves to three names; the other 81% is the diversified residual.
+    assert lt["residual_diversified_pct"] == 81.0
+    # Weights are over everything invested, so effective_n reflects the residual.
+    assert lt["concentration"]["effective_n"] > 20
+
+
+def test_hhi_ignores_cash_but_not_residual(monkeypatch):
+    # Cash must stay out of the denominator: adding it may not change how
+    # concentrated the equity sleeve is.
+    monkeypatch.setattr(portfolio, "_fund_holdings", lambda t: None)
+    monkeypatch.setattr(portfolio, "_fund_sectors", lambda t: None)
+    monkeypatch.setattr(portfolio, "_stock_sector", lambda t: "Tech")
+    rows = [{"ticker": "AAPL", "value": 500.0}, {"ticker": "MSFT", "value": 500.0}]
+    no_cash = portfolio.look_through(rows, cash=0.0)["concentration"]
+    with_cash = portfolio.look_through(rows, cash=9000.0)["concentration"]
+    assert no_cash["effective_n"] == with_cash["effective_n"] == 2.0
+
+
+def test_single_name_is_maximally_concentrated(monkeypatch):
+    monkeypatch.setattr(portfolio, "_fund_holdings", lambda t: None)
+    monkeypatch.setattr(portfolio, "_fund_sectors", lambda t: None)
+    monkeypatch.setattr(portfolio, "_stock_sector", lambda t: "Tech")
+    lt = portfolio.look_through([{"ticker": "AAPL", "value": 1000.0}], cash=0.0)
+    assert lt["concentration"]["hhi"] == 1.0
+    assert lt["concentration"]["effective_n"] == 1.0

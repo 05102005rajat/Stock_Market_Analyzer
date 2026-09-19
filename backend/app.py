@@ -6,6 +6,8 @@ frontend can render everything from a single request.
 """
 from __future__ import annotations
 
+import math
+
 from dotenv import load_dotenv
 
 # Load backend/.env (e.g. FINNHUB_API_KEY) before any service reads os.environ.
@@ -60,7 +62,13 @@ def health():
 
 def _validate_holdings(holdings) -> str | None:
     """Return an error message if `holdings` isn't a well-formed list of
-    {ticker, shares[, avg_cost]} dicts, else None."""
+    {ticker, shares[, avg_cost]} dicts, else None.
+
+    Numbers are coerced in place: a JSON payload may legitimately send
+    "10" rather than 10, and testing float() without keeping the result
+    let the string through to `shares * price`, which raised a TypeError
+    the route then reported as a 500.
+    """
     if not isinstance(holdings, list):
         return "'holdings' must be a list"
     for h in holdings:
@@ -73,15 +81,27 @@ def _validate_holdings(holdings) -> str | None:
         if shares is None:
             return f"holding '{ticker}' is missing 'shares'"
         try:
-            float(shares)
+            shares = float(shares)
         except (TypeError, ValueError):
             return f"holding '{ticker}' has an invalid 'shares' value"
+        # NaN/Infinity survive float() and propagate into every total;
+        # jsonify would then emit a bare NaN token, which isn't valid JSON.
+        if not math.isfinite(shares):
+            return f"holding '{ticker}' has a non-finite 'shares' value"
+        if shares < 0:
+            return f"holding '{ticker}' has a negative 'shares' value"
+        h["shares"] = shares
         avg_cost = h.get("avg_cost")
         if avg_cost is not None:
             try:
-                float(avg_cost)
+                avg_cost = float(avg_cost)
             except (TypeError, ValueError):
                 return f"holding '{ticker}' has an invalid 'avg_cost' value"
+            if not math.isfinite(avg_cost):
+                return f"holding '{ticker}' has a non-finite 'avg_cost' value"
+            if avg_cost < 0:
+                return f"holding '{ticker}' has a negative 'avg_cost' value"
+            h["avg_cost"] = avg_cost
     return None
 
 
