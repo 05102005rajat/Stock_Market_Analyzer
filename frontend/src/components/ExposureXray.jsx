@@ -47,7 +47,9 @@ export default function ExposureXray({ lt }) {
         <span>Top-3 names: <b>{c.top3_pct == null ? "\u2014" : `${c.top3_pct}%`}</b></span>
         <span>Mega-cap tech: <b>{c.megacap8_pct == null ? "\u2014" : `${c.megacap8_pct}%`}</b></span>
         <span>Cash: <b>{cash_pct}%</b></span>
-        <span>Effective # of bets: <b>{c.effective_n ?? "\u2014"}</b></span>
+        <span title="Measured on your invested money only — cash is not an equity bet, so it can't make the stock sleeve look more diversified. The other percentages here are of the whole account, cash included.">
+          Effective # of bets: <b>{c.effective_n ?? "\u2014"}</b>
+        </span>
       </div>
       <p className="muted small">🔁 = owned both directly and inside a fund (counts twice toward your real exposure). {note}</p>
     </section>

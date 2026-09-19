@@ -60,14 +60,32 @@ def health():
     return jsonify({"status": "ok"})
 
 
+def _coerce_amount(value, label: str, allow_negative: bool = False) -> tuple[float | None, str | None]:
+    """Coerce a JSON number-ish value to a finite float.
+
+    Returns (number, None) on success or (None, error message). A JSON payload
+    may legitimately send "10" rather than 10, so the coerced result must be
+    kept: testing float() and discarding it let the string through to
+    `shares * price`, which raised a TypeError the route reported as a 500.
+    NaN/Infinity survive float() too, and would propagate into every total —
+    jsonify then emits a bare NaN token, which isn't valid JSON.
+    """
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None, f"{label} is invalid"
+    if not math.isfinite(number):
+        return None, f"{label} is non-finite"
+    if number < 0 and not allow_negative:
+        return None, f"{label} is negative"
+    return number, None
+
+
 def _validate_holdings(holdings) -> str | None:
     """Return an error message if `holdings` isn't a well-formed list of
     {ticker, shares[, avg_cost]} dicts, else None.
 
-    Numbers are coerced in place: a JSON payload may legitimately send
-    "10" rather than 10, and testing float() without keeping the result
-    let the string through to `shares * price`, which raised a TypeError
-    the route then reported as a 500.
+    Numbers are coerced in place (see `_coerce_amount`).
     """
     if not isinstance(holdings, list):
         return "'holdings' must be a list"
@@ -77,30 +95,16 @@ def _validate_holdings(holdings) -> str | None:
         ticker = h.get("ticker")
         if not ticker or not isinstance(ticker, str):
             return "each holding must include a non-empty 'ticker'"
-        shares = h.get("shares")
-        if shares is None:
+        if h.get("shares") is None:
             return f"holding '{ticker}' is missing 'shares'"
-        try:
-            shares = float(shares)
-        except (TypeError, ValueError):
-            return f"holding '{ticker}' has an invalid 'shares' value"
-        # NaN/Infinity survive float() and propagate into every total;
-        # jsonify would then emit a bare NaN token, which isn't valid JSON.
-        if not math.isfinite(shares):
-            return f"holding '{ticker}' has a non-finite 'shares' value"
-        if shares < 0:
-            return f"holding '{ticker}' has a negative 'shares' value"
+        shares, err = _coerce_amount(h["shares"], f"'shares' for holding '{ticker}'")
+        if err:
+            return err
         h["shares"] = shares
-        avg_cost = h.get("avg_cost")
-        if avg_cost is not None:
-            try:
-                avg_cost = float(avg_cost)
-            except (TypeError, ValueError):
-                return f"holding '{ticker}' has an invalid 'avg_cost' value"
-            if not math.isfinite(avg_cost):
-                return f"holding '{ticker}' has a non-finite 'avg_cost' value"
-            if avg_cost < 0:
-                return f"holding '{ticker}' has a negative 'avg_cost' value"
+        if h.get("avg_cost") is not None:
+            avg_cost, err = _coerce_amount(h["avg_cost"], f"'avg_cost' for holding '{ticker}'")
+            if err:
+                return err
             h["avg_cost"] = avg_cost
     return None
 
@@ -111,10 +115,24 @@ def portfolio_view():
     holdings, cash = None, None
     if request.method == "POST":
         body = request.get_json(silent=True) or {}
+        # A JSON array (or any non-object) body would blow up on .get below and
+        # escape the try around the service call, so Flask would answer with an
+        # HTML 500 instead of a JSON error.
+        if not isinstance(body, dict):
+            return jsonify({"error": "request body must be a JSON object"}), 400
         holdings = body.get("holdings")  # [{ticker, shares, avg_cost}, ...]
         cash = body.get("cash")
         if holdings is not None:
             err = _validate_holdings(holdings)
+            if err:
+                return jsonify({"error": err}), 400
+        if cash is not None:
+            # Same coercion story as 'shares': a bad 'cash' raised inside
+            # analyze_portfolio (a 500 that's really a client error), and a
+            # NaN sailed through into `"cash": NaN` — not valid JSON.
+            # Negative cash is legitimate: a margin account carries a debit
+            # balance. Only non-numeric and non-finite values are rejected.
+            cash, err = _coerce_amount(cash, "'cash'", allow_negative=True)
             if err:
                 return jsonify({"error": err}), 400
     try:
