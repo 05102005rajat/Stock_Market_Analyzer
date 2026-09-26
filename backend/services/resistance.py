@@ -197,10 +197,17 @@ def analyze(df: pd.DataFrame) -> dict:
     if above and not was_above:
         state = "fresh_breakout"
     elif above:
-        # how long has it held?
-        recent = close.iloc[-21:]
-        lv = high.shift(1).rolling(LOOKBACK).max().iloc[-21:]
-        frac = float((recent > lv).mean())
+        # "Has it held?" means: of the last 21 sessions, how many closed above
+        # the level that was resistance BEFORE this window — i.e. the 50-day
+        # high as of 21 bars ago. The old code compared against a rolling
+        # 50-day high that ratcheted up to include the breakout bar's own
+        # spike, so the fraction could never reach 0.6 and "holding_above"
+        # was unreachable.
+        HOLD_WIN = 21
+        prior = high.iloc[-(HOLD_WIN + LOOKBACK + 1) : -(HOLD_WIN + 1)]
+        breakout_level = float(prior.max()) if len(prior) else level
+        recent = close.iloc[-HOLD_WIN:]
+        frac = float((recent > breakout_level).mean())
         state = "holding_above" if frac >= 0.6 else "choppy_above"
     elif pct_to_level <= NEAR * 100:
         state = "approaching"

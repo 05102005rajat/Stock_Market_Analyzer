@@ -52,7 +52,11 @@ export default function Alerts({ data, ticker }) {
   const [value, setValue] = useState(30);
 
   useEffect(() => {
-    localStorage.setItem(KEY, JSON.stringify(rules));
+    // The matching read above is guarded; this write wasn't. It runs on mount,
+    // so a throw (private browsing, quota) unmounted the whole analyze view.
+    try {
+      localStorage.setItem(KEY, JSON.stringify(rules));
+    } catch { /* alerts are a convenience; losing persistence is not fatal */ }
   }, [rules]);
 
   const def = RULE_TYPES.find((x) => x.id === type);

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { analyze, getPortfolio, savePortfolio, getScan } from "./api";
 import PriceChart from "./components/PriceChart";
 import IndicatorPanel from "./components/IndicatorPanel";
@@ -41,6 +41,9 @@ export default function App() {
   const [data, setData] = useState(null);
   const [compareData, setCompareData] = useState(null);
   const [loading, setLoading] = useState(false);
+  // Monotonic id for the in-flight analyze request; only the newest may
+  // write state (see run()).
+  const runSeq = useRef(0);
   const [error, setError] = useState(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [mode, setMode] = useState("analyze"); // "analyze" | "portfolio"
@@ -102,19 +105,26 @@ export default function App() {
     const tk = (tickerOverride || ticker).trim();
     if (!tk) return;
     const effectiveSplit = splitOverride !== undefined ? splitOverride : splitTf;
+    // Only the newest request may write state. pick() and the 60s auto-refresh
+    // aren't gated by the disabled submit button, so a slower earlier response
+    // could otherwise land last and show a different ticker than the input.
+    const seq = ++runSeq.current;
+    const isStale = () => seq !== runSeq.current;
     setLoading(true);
     setError(null);
     const safeHorizon = Math.min(60, Math.max(1, Number.isFinite(horizon) ? horizon : 10));
     const params = { period, interval, horizon: safeHorizon };
     try {
       const result = await analyze({ ticker: tk, ...params });
+      if (isStale()) return;
       setData(result);
       setFocus(null);
       if (compareTicker.trim()) {
         try {
-          setCompareData(await analyze({ ticker: compareTicker.trim(), ...params }));
+          const cmp = await analyze({ ticker: compareTicker.trim(), ...params });
+          if (!isStale()) setCompareData(cmp);
         } catch {
-          setCompareData(null);
+          if (!isStale()) setCompareData(null);
         }
       } else {
         setCompareData(null);
@@ -123,18 +133,20 @@ export default function App() {
       if (effectiveSplit) {
         try {
           const splitPeriod = DEFAULT_PERIOD_FOR_INTERVAL[effectiveSplit] || "2y";
-          setSplitData(await analyze({ ticker: tk, period: splitPeriod, interval: effectiveSplit, horizon: safeHorizon }));
+          const sp = await analyze({ ticker: tk, period: splitPeriod, interval: effectiveSplit, horizon: safeHorizon });
+          if (!isStale()) setSplitData(sp);
         } catch {
-          setSplitData(null);
+          if (!isStale()) setSplitData(null);
         }
       } else {
         setSplitData(null);
       }
     } catch (err) {
+      if (isStale()) return;
       setError(err.message);
       setData(null);
     } finally {
-      setLoading(false);
+      if (!isStale()) setLoading(false);
     }
   };
 
@@ -165,7 +177,11 @@ export default function App() {
 
   // Save edited holdings/cash → persist + recompute.
   const savePf = async (holdings, cash) => {
-    localStorage.setItem("pf.config", JSON.stringify({ holdings, cash }));
+    // Was outside the try: a throw here (private browsing, quota) made Save a
+    // silent no-op instead of still persisting to the server.
+    try {
+      localStorage.setItem("pf.config", JSON.stringify({ holdings, cash }));
+    } catch { /* non-fatal: the server copy is the source of truth */ }
     setPfLoading(true);
     setPfError(null);
     try {

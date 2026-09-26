@@ -1,3 +1,6 @@
+# NOTE: these fixtures must mirror what the producers actually emit —
+# minervini.trend_template() -> "passes", insiders.analyze() -> "signal".
+# Hand-built shapes hid two dead branches for months; see test_contracts.py.
 """Tests for the conviction-stack engine (evidence-backed signal aggregation)."""
 from services import conviction
 
@@ -5,8 +8,8 @@ from services import conviction
 def test_aligned_strong_signals_high_conviction():
     r = conviction.assess({
         "relativeStrength": {"outperforming": True, "excess_pct": 18.0, "lookback": "6mo"},
-        "minervini": {"available": True, "passed": True, "stage": "Stage 2", "score": "8/8"},
-        "insider": {"available": True, "cluster_buy": True, "buying": True,
+        "minervini": {"available": True, "passes": True, "stage": "Stage 2", "score": "8/8"},
+        "insider": {"available": True, "cluster_buy": True, "signal": "buying",
                     "buy_people": 4, "buy_value": 1_000_000},
         "crossover": {"available": True, "state": "buy"},
     })
@@ -33,7 +36,7 @@ def test_chart_signal_has_zero_weight():
 def test_earnings_runup_is_a_caution():
     r = conviction.assess({
         "relativeStrength": {"outperforming": True, "excess_pct": 20.0, "lookback": "6mo"},
-        "minervini": {"available": True, "passed": True, "stage": "Stage 2", "score": "8/8"},
+        "minervini": {"available": True, "passes": True, "stage": "Stage 2", "score": "8/8"},
         "earningsWatch": {"available": True, "hot_runup": True, "days_to_earnings": 5},
     })
     cautions = [c for c in r["components"] if c["state"] == "caution"]

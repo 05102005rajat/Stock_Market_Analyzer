@@ -183,7 +183,12 @@ def _chart_context(df, chart_patterns):
     out = []
     last = df.index[-1]
     for p in chart_patterns[:4]:
-        end = p.get("end") or p.get("end_date") or p.get("to")
+        # patterns._pattern() emits {name, bias, description, points}; there is
+        # no "end" key, so this used to be None for every pattern, which made
+        # `stale` unconditionally True. The completion date is the last point.
+        pts = p.get("points") or []
+        end = (p.get("end") or p.get("end_date") or p.get("to")
+               or (pts[-1].get("date") if pts else None))
         try:
             age = (last - pd.Timestamp(end)).days if end else None
         except Exception:

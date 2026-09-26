@@ -302,6 +302,9 @@ def look_through(rows: list[dict], cash: float = 0.0) -> dict:
         "sectors": sectors,
         "flags": flags,
         "residual_diversified_pct": round(residual / total * 100, 1),
+        # Full un-truncated map (effective is top-12 only) so callers computing
+        # theme/sector caps don't silently miss the tail.
+        "exposure_all": {tk: round(val, 2) for tk, val in exposure.items()},
         "concentration": {
             "hhi": round(hhi, 3) if hhi is not None else None,
             "effective_n": round(1 / hhi, 1) if hhi else None,
@@ -451,9 +454,19 @@ def analyze_portfolio(holdings: list[dict] | None = None, cash: float | None = N
     # Concentration with look-through theme detection (the real risk for a
     # small AI-heavy book): single-name >10%, theme >40%.
     from services import risk as _risk
+    # lt["effective"] is truncated to the top 12 names, so building theme
+    # weights from it silently dropped everything ranked 13th or lower and
+    # let the 40% theme cap be breached without a flag. Use the full
+    # un-truncated exposure map when look_through provides it.
     weights = {}
-    for e in (lt.get("effective") or []):
-        weights[e.get("ticker", e.get("name", "?"))] = e.get("pct", e.get("weight", 0)) / 100.0
+    full = lt.get("exposure_all")
+    if full:
+        total = lt.get("total") or 0
+        if total > 0:
+            weights = {tk: val / total for tk, val in full.items()}
+    if not weights:
+        for e in (lt.get("effective") or []):
+            weights[e.get("ticker", e.get("name", "?"))] = e.get("pct", e.get("weight", 0)) / 100.0
     THEMES = {
         "AI / Semiconductors": ["NVDA", "AVGO", "TSM", "MU", "AMD", "QCOM", "AMAT",
                                  "LRCX", "ASML", "MRVL", "SNDK", "INTC", "SMCI"],

@@ -19,7 +19,22 @@ from services import candlesticks, data, dipsignal, indicators, portfolio, relat
 
 # Curated important, liquid names to round out the user's own book.
 IMPORTANT = ["AMD", "AVGO", "JPM", "V", "MA", "LLY", "UNH", "HD", "ORCL", "CRM", "PLTR"]
-FUNDS = {"VOO", "QQQ", "SPYM", "SPY", "DIA", "IVV"}  # index funds: no single-name "dip" setup
+# Known index funds, kept as a fast path / offline fallback. The real check is
+# _is_fund() below: this list missed every ETF in the actual book (SCHD, TBIL,
+# VIG, VTI, XLE, XLF, XLI, XLV), so they were scored as single-name dip setups
+# — including TBIL, a T-bill fund.
+FUNDS = {"VOO", "QQQ", "SPYM", "SPY", "DIA", "IVV"}
+
+
+def _is_fund(ticker: str) -> bool:
+    """A 'buy the dip' setup is meaningless for a basket. Prefer the generic
+    holdings lookup and fall back to the static list when it's unavailable."""
+    if ticker in FUNDS:
+        return True
+    try:
+        return bool(portfolio._fund_holdings(ticker))
+    except Exception:
+        return False
 
 
 def universe() -> list[str]:
@@ -27,7 +42,7 @@ def universe() -> list[str]:
     tickers = [h["ticker"] for h in cfg["holdings"]] + cfg.get("watchlist", []) + IMPORTANT
     seen, out = set(), []
     for t in tickers:
-        if t in FUNDS or t in seen:
+        if t in seen or _is_fund(t):
             continue
         seen.add(t)
         out.append(t)

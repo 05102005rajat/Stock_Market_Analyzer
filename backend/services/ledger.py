@@ -226,15 +226,19 @@ def calibration(min_n: int = 5) -> dict:
         by_type.setdefault(r["signal_type"], []).append(r)
     type_stats = []
     for t, rs in sorted(by_type.items()):
-        rets = [x["ret_21"] for x in rs if x["ret_21"] is not None]
         # direction-adjust: for "down" signals, a profitable call is a fall
         dir_rets = [
             (x["ret_21"] if x["direction"] != "down" else -x["ret_21"])
             for x in rs if x["ret_21"] is not None
         ]
+        # Edge is only meaningful against a benchmark we actually have. The SPY
+        # fetch is best-effort (see the silent except in evaluate), so bench_21
+        # is NULL for some rows; coercing it to 0 counted the whole raw return
+        # as alpha and inflated the scoreboard. Skip those rows instead.
         edges = [
-            (x["ret_21"] - (x["bench_21"] or 0)) * (1 if x["direction"] != "down" else -1)
-            for x in rs if x["ret_21"] is not None
+            (x["ret_21"] - x["bench_21"]) * (1 if x["direction"] != "down" else -1)
+            for x in rs
+            if x["ret_21"] is not None and x["bench_21"] is not None
         ]
         if not dir_rets:
             continue
@@ -243,7 +247,10 @@ def calibration(min_n: int = 5) -> dict:
             "n": len(dir_rets),
             "win_rate": round(100 * float(np.mean([d > 0 for d in dir_rets])), 0),
             "avg_dir_return_21d": round(100 * float(np.mean(dir_rets)), 2),
-            "avg_edge_vs_spy_21d": round(100 * float(np.mean(edges)), 2),
+            # None (not 0) when no row has a benchmark — "unknown" must not
+            # read as "no edge".
+            "avg_edge_vs_spy_21d": round(100 * float(np.mean(edges)), 2) if edges else None,
+            "n_benchmarked": len(edges),
         })
 
     # Calibration curve for probability-bearing signals.

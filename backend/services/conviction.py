@@ -95,7 +95,10 @@ def assess(ctx: dict) -> dict:
 
     # 2) TREND STAGE (Minervini) — MODERATE ---------------------------------
     if mino.get("available"):
-        passed = mino.get("passed")
+        # trend_template() emits "passes" at the top level; "passed" exists
+        # only on the nested per-criterion dicts, so reading it here silently
+        # disabled this whole component.
+        passed = mino.get("passes")
         stage = mino.get("stage")
         sc = mino.get("score")
         if passed:
@@ -107,14 +110,17 @@ def assess(ctx: dict) -> dict:
 
     # 3) OPPORTUNISTIC INSIDER BUYING — STRONG ------------------------------
     if ins.get("available"):
-        if ins.get("cluster_buy") or ins.get("buying"):
+        # analyze() emits signal="buying"|"selling"|"routine"; there are no
+        # "buying"/"selling" booleans, so single-insider buys were dropped and
+        # the selling branch below was unreachable.
+        if ins.get("cluster_buy") or ins.get("signal") == "buying":
             val = ins.get("buy_value")
             npl = ins.get("buy_people")
             extra = f"{npl} insiders, ${val:,.0f}" if (npl and val) else "open-market buying"
             tag = "cluster of insiders" if ins.get("cluster_buy") else "insider"
             _add(comps, "Insider buying (Form 4)", "strong", "bullish",
                  f"Recent open-market {tag} buying ({extra}) — informed cash going in.")
-        elif ins.get("selling"):
+        elif ins.get("signal") == "selling":
             # selling is a WEAK signal (often routine/diversification) — note, don't over-weight
             _add(comps, "Insider activity (Form 4)", "weak", "neutral",
                  "Recent insider selling — usually routine/diversification; weak signal.")

@@ -179,9 +179,18 @@ def api_forecast_record():
     """Walk-forward forecast accuracy ('how many times was it right?'). Cached
     per ticker+horizon for 6h since it retrains models and is slow."""
     ticker = (request.args.get("ticker") or "").strip().upper()
-    horizon = int(request.args.get("horizon", 10))
+    # A bare int() here raised outside the try, so Flask answered junk input
+    # with an HTML 500 the frontend can't parse. Reject it as a JSON 400
+    # instead of silently falling back to the default.
+    raw_horizon = request.args.get("horizon")
+    try:
+        horizon = 10 if raw_horizon in (None, "") else int(raw_horizon)
+    except (TypeError, ValueError):
+        return jsonify({"error": "'horizon' must be a positive integer"}), 400
     if not ticker:
         return jsonify({"error": "ticker required"}), 400
+    if horizon < 1:
+        return jsonify({"error": "'horizon' must be a positive integer"}), 400
     key = f"{ticker}:{horizon}"
     import time as _t
     hit = _FC_RECORD_CACHE.get(key)
@@ -203,10 +212,15 @@ def api_ledger():
         ledger_engine.evaluate(lambda tk: data.fetch_ohlcv(tk, period="1y", interval="1d")["close"])
     except Exception:
         pass  # scoring is best-effort
-    return jsonify({
-        "calibration": ledger_engine.calibration(),
-        "recent": ledger_engine.recent(limit=40),
-    })
+    # calibration()/recent() hit SQLite and were outside any guard, so a bad DB
+    # path produced an HTML 500 instead of a JSON error.
+    try:
+        return jsonify({
+            "calibration": ledger_engine.calibration(),
+            "recent": ledger_engine.recent(limit=40),
+        })
+    except Exception as e:
+        return jsonify({"error": f"Ledger read failed: {e}"}), 500
 
 
 @app.get("/api/portfolio-risk")

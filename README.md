@@ -8,7 +8,7 @@ A personal stock-analysis web app that does something most stock tools refuse to
 
 ## Key results
 
-- **145/145 backend tests passing** (`pytest`, 23 test files), covering 33 self-contained signal-engine modules under `backend/services/`.
+- **151/151 backend tests passing** (`pytest`, 24 test files), covering 33 self-contained signal-engine modules under `backend/services/`.
 - **33 standalone backtest/research scripts** (`backend/*_test.py`, `*_backtest.py`, `*_study.py`, `walkforward.py`, …) — point-in-time and causal (no lookahead bias) — are what actually back every row of the evidence-hierarchy table below, not just asserted claims.
 - **Portfolio concentration is quantified, not eyeballed**: Herfindahl-Hirschman Index (HHI) and effective-N computed after ETF look-through, plus cross-holding detection that flags a ticker held both directly *and* inside a fund (e.g., NVDA held outright and inside QQQ).
 - **Forecast module** is a walk-forward-validated `scikit-learn` `GradientBoostingRegressor` on lagged log-return/technical features, run recursively for multi-step projection with a per-stock, volatility-scaled adaptive confidence band — and it self-reports its own rolling directional hit-rate instead of just claiming accuracy.
@@ -137,7 +137,7 @@ backend/                Flask API (Python)
     analysts.py, news.py, backtest.py, scanner.py, strategies.py, ...
   *_test.py, *_backtest.py, *_study.py, walkforward.py, ...
                         33 research/backtest scripts (point-in-time, no lookahead)
-  tests/                pytest suite (145 tests, 23 test files)
+  tests/                pytest suite (151 tests, 24 test files)
 
 frontend/               React + Vite
   src/components/        one card per engine:
@@ -159,7 +159,7 @@ Price data comes from Yahoo (via `yfinance`), ~15-minute delayed, with an in-pro
 
 ```bash
 cd backend
-python -m pytest -q          # 134 tests
+python -m pytest -q          # 151 tests
 ```
 
 Backtests are point-in-time (causal indicators, forward returns from the future bar) to avoid lookahead bias. Run the crossover breakout study directly:

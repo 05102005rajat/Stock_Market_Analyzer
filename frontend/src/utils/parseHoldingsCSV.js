@@ -46,15 +46,27 @@ export function parseHoldingsCSV(text) {
   const col = (...names) => header.findIndex((h) => names.some((n) => h.includes(n)));
   const ti = col("symbol", "ticker", "instrument");
   const qi = col("quantity", "shares", "qty");
-  const ci = col("average cost", "avg cost", "average buy", "cost basis", "avg price", "average price");
+  // Per-share cost only. "cost basis" is excluded on purpose: in Schwab and
+  // E*Trade exports it's the TOTAL dollar cost of the lot, so treating it as a
+  // per-share price turned a 10-share/$1,500-basis position into avg_cost 1500
+  // and showed a ~90% loss. It's picked up separately below and divided out.
+  const ci = col("average cost", "avg cost", "average buy", "avg price", "average price", "cost/share", "cost per share");
+  const bi = col("cost basis", "total cost");
 
   const merged = {};
   for (let i = hi + 1; i < lines.length; i++) {
     const r = splitCSVLine(lines[i]);
-    const ticker = (r[ti] || "").trim().toUpperCase().replace(/[^A-Z.]/g, "");
+    // Keep hyphens: BRK-B became BRKB, which the backend can't fetch and which
+    // then vanished silently into summary.failed_tickers.
+    const ticker = (r[ti] || "").trim().toUpperCase().replace(/[^A-Z.\-]/g, "");
     const shares = num(r[qi]);
     if (!ticker || !(shares > 0)) continue;            // skip cash rows, blanks, totals
-    const avg = ci >= 0 ? num(r[ci]) : null;
+    let avg = ci >= 0 ? num(r[ci]) : null;
+    if (avg == null && bi >= 0) {
+      // Only a total-cost column available — convert it to per-share.
+      const basis = num(r[bi]);
+      if (basis != null && shares > 0) avg = basis / shares;
+    }
     if (!merged[ticker]) {
       merged[ticker] = { ticker, shares, avg_cost: avg };
     } else {
